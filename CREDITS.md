@@ -1,0 +1,34 @@
+# BesideU
+## Credits
+
+### Developer: Muhammad Ali
+### Director: Habeebullah Arif
+### Co-Director: Aneeq
+### Cooridinator: Hadi Bhai
+### Contributors: [null]
+
+---
+
+## Devlog
+
+### Ideation start: Early 2025
+Mostly Habeebullah & Aneeq
+
+### Initial Pitch: 11/10/2025
+Hadi was my classfellow at college. I was invited by him to come and meet Habeebullah. This was the first time I met 'im. And when he pitched the idea, I knew he was into something big. I accepted the deal, and started planning.
+
+### Early development start: 11/17/2025
+Developed an early setup of the app, set up Expo, and made a basic frontend to share the idea with other people.
+
+### Development start: 12/7/2025
+Started the actual development.
+
+### Expected Beta: 1/1/2026
+InshaAllah
+
+### Expected Release: 3/1/2026
+Yeah
+
+---
+
+Made with love by students of the GCU Lahore, code held together with duct tape, glue, and a hope. A hope of being able to help people of the society, to solve, at any rate, their problems.
