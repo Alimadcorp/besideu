@@ -39,9 +39,12 @@ This document lists all tasks needed to complete the BesideU application, organi
 ## 3. Backend - Authentication System
 
 - [ ] Implement phone number signup endpoint (`POST /auth/signup`)
-- [ ] Integrate SMS verification service (Twilio, AWS SNS, or similar)
+- [ ] Integrate WhatsApp Business API (Facebook Developers platform)
+- [ ] Set up WhatsApp Business API credentials and phone number
+- [ ] Implement TOTP (Time-based One-Time Password) generation
 - [ ] Implement verification code endpoint (`POST /auth/verify`)
-- [ ] Generate and store verification codes with expiration
+- [ ] Send TOTP codes via WhatsApp Business API
+- [ ] Validate TOTP codes with time window tolerance
 - [ ] Implement login endpoint (`POST /auth/login`)
 - [ ] Implement password hashing (bcrypt or similar)
 - [ ] Generate JWT tokens with user ID and phone in payload
@@ -203,7 +206,7 @@ This document lists all tasks needed to complete the BesideU application, organi
 - [ ] Implement password input with strength indicator
 - [ ] Call `/auth/signup` API endpoint
 - [ ] Create verification screen UI
-- [ ] Implement verification code input (6-digit code)
+- [ ] Implement TOTP code input (6-digit code from WhatsApp)
 - [ ] Call `/auth/verify` API endpoint
 - [ ] Store JWT token in SecureStore upon successful verification
 - [ ] Create login screen UI

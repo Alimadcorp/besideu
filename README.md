@@ -106,7 +106,7 @@ The app will authenticate users based on phone number only. Later on you can lin
   **Response**: 
   ```json
   {
-    "message": "Verification code sent",
+    "message": "TOTP code sent via WhatsApp",
     "expires_in": 300
   }
   ```
@@ -121,7 +121,7 @@ The app will authenticate users based on phone number only. Later on you can lin
 
 - **POST** `/auth/verify`
 
-  Verify phone number with SMS code.
+  Verify phone number with TOTP code received via WhatsApp.
   
   **Body**: 
   ```json
@@ -600,7 +600,9 @@ The following tables will be created in Supabase:
 - `user_id_1` (UUID, foreign key to users)
 - `user_id_2` (UUID, foreign key to users)
 - `created_at` (timestamp)
+- CHECK constraint: `user_id_1 < user_id_2` (ensures consistent ordering)
 - Unique constraint on (user_id_1, user_id_2)
+- **Note**: `user_id_1` must always be the smaller UUID to prevent duplicate bidirectional friendships. Application logic must ensure this ordering when creating friendships.
 
 ### `friend_requests`
 - `id` (UUID, primary key)
@@ -608,6 +610,7 @@ The following tables will be created in Supabase:
 - `to_user_id` (UUID, foreign key to users)
 - `status` (enum: pending, accepted, declined, cancelled)
 - `created_at` (timestamp)
+- Unique constraint on (from_user_id, to_user_id) where status = 'pending' (prevents duplicate pending requests)
 
 ### `contacts`
 - `id` (UUID, primary key)
@@ -659,8 +662,9 @@ All tables will have RLS policies to ensure users can only access their own data
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin operations)
 - `JWT_SECRET` - Secret key for JWT token signing
 - `JWT_EXPIRES_IN` - JWT expiration time (default: 24h)
-- `SMS_API_KEY` - API key for SMS verification service
-- `SMS_API_URL` - SMS service provider URL
+- `WHATSAPP_BUSINESS_ACCESS_TOKEN` - WhatsApp Business API access token (Facebook Developers)
+- `WHATSAPP_BUSINESS_PHONE_NUMBER_ID` - WhatsApp Business phone number ID
+- `WHATSAPP_BUSINESS_API_URL` - WhatsApp Business API base URL (default: https://graph.facebook.com/v18.0)
 - `IMGBB_API_KEY` - ImgBB API key for image uploads
 - `NODE_ENV` - Environment (development/production)
 
@@ -680,10 +684,11 @@ All tables will have RLS policies to ensure users can only access their own data
 ## Authentication Flow
 
 1. **Signup**: User provides phone, username, real_name, and password
-   - Backend sends SMS verification code
-   - Code expires in 5 minutes
+   - Backend generates TOTP code and sends it via WhatsApp Business API
+   - TOTP code expires in 5 minutes (time window for validation)
 
-2. **Verification**: User provides phone and verification code
+2. **Verification**: User provides phone and TOTP code (received via WhatsApp)
+   - Backend validates TOTP code using time-based algorithm
    - If valid, account is created and JWT token is returned
    - User is now authenticated
 
