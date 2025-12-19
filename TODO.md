@@ -38,127 +38,116 @@ This document lists all tasks needed to complete the BesideU application, organi
 
 ## 3. Backend - Authentication System
 
-- [ ] Set up Firebase Admin SDK in NextJS API
-- [ ] Configure Firebase service account credentials
-- [ ] Implement phone number signup endpoint (`POST /auth/signup`)
-- [ ] Verify Firebase ID token from client using Firebase Admin SDK
-- [ ] Extract phone number from verified Firebase token
-- [ ] Create user account in Supabase with Firebase UID
-- [ ] Implement login endpoint (`POST /auth/login`)
-- [ ] Verify Firebase ID token for login
-- [ ] Look up user by phone number or Firebase UID
-- [ ] Generate JWT tokens with user ID and phone in payload
-- [ ] Implement JWT middleware for `/v1` routes
-- [ ] Add JWT token validation and user context extraction
-- [ ] Create utility functions for JWT operations
-- [ ] Add email linking feature structure (future enhancement placeholder)
+- [x] Set up Firebase Admin SDK in NextJS API
+- [x] Configure Firebase service account credentials
+- [x] Implement phone number signup endpoint (`POST /auth/signup`)
+- [x] Verify Firebase ID token from client using Firebase Admin SDK
+- [x] Extract phone number from verified Firebase token
+- [x] Create user account in Supabase with Firebase UID
+- [x] Implement login endpoint (`POST /auth/login`)
+- [x] Verify Firebase ID token for login
+- [x] Look up user by phone number or Firebase UID
+- [x] Generate JWT tokens with user ID and phone in payload
+- [x] Implement JWT middleware for `/v1` routes
+- [x] Add JWT token validation and user context extraction
+- [x] Create utility functions for JWT operations
+
 
 ---
 
 ## 4. Backend - User Location System
 
-- [ ] Research and implement Geohash library/utility functions
-- [ ] Implement `PUT /v1/location/set` endpoint
-- [ ] Validate Geohash format and precision
-- [ ] Update user location in `user_locations` table
-- [ ] Implement `GET /v1/location/find` endpoint
-- [ ] Calculate Geohash-based distance between users
-- [ ] Implement range filtering (kilometers)
-- [ ] Add user preference default range lookup
-- [ ] Optimize queries for Vercel 5-second execution limit
-- [ ] Add pagination for location find results
-- [ ] Test geohash accuracy and distance calculations
+- [x] Research and implement Geohash library/utility functions
+- [x] Implement `PUT /v1/location/set` endpoint
+- [x] Validate Geohash format and precision
+- [x] Update user location in `user_locations` table
+- [x] Implement `GET /v1/location/find` endpoint
+- [x] Calculate Geohash-based distance between users
+- [x] Implement range filtering (kilometers)
+- [x] Add user preference default range lookup
+- [x] Add pagination for location find results
 
 ---
 
 ## 5. Backend - Friends System
 
-- [ ] Implement `POST /v1/friends/add` endpoint
-- [ ] Validate user exists and is not already a friend
-- [ ] Create friend request in `friend_requests` table
-- [ ] Prevent duplicate friend requests
-- [ ] Implement `GET /v1/friends/requests` endpoint
-- [ ] Return both incoming and outgoing requests
-- [ ] Include user information with requests
-- [ ] Implement `POST /v1/friends/accept` endpoint
-- [ ] Create friendship record in `friends` table
-- [ ] Update friend request status
-- [ ] Implement `DELETE /v1/friends/remove` endpoint
-- [ ] Handle removal of both friendships and pending requests
-- [ ] Add friend status validation utilities
-- [ ] Test friend request flow end-to-end
+- [x] Implement `POST /v1/friends/add` endpoint
+- [x] Validate user exists and is not already a friend
+- [x] Create friend request in `friend_requests` table
+- [x] Prevent duplicate friend requests
+- [x] Implement `GET /v1/friends/requests` endpoint
+- [x] Return both incoming and outgoing requests
+- [x] Include user information with requests
+- [x] Implement `POST /v1/friends/accept` endpoint
+- [x] Create friendship record in `friends` table
+- [x] Update friend request status
+- [x] Implement `DELETE /v1/friends/remove` endpoint
+- [x] Handle removal of both friendships and pending requests
+- [x] Add friend status validation utilities
 
 ---
 
 ## 6. Backend - Contacts System
 
-- [ ] Implement `PUT /v1/contacts/set` endpoint
-- [ ] Validate contacts data structure
+- [x] Implement `PUT /v1/contacts/set` endpoint
+- [x] Validate contacts data structure
 - [ ] Normalize phone numbers (remove spaces, dashes, handle country codes)
-- [ ] Store contacts in `contacts` table
-- [ ] Match contacts with existing users by phone number
-- [ ] Implement `GET /v1/contacts/list` endpoint
-- [ ] Return matched users with contact information
-- [ ] Handle contact privacy settings
-- [ ] Filter out users who have disabled contact discovery
-- [ ] Test phone number normalization and matching
+- [x] Store contacts in `contacts` table
+- [x] Match contacts with existing users by phone number
+- [x] Implement `GET /v1/contacts/list` endpoint
+- [x] Return matched users with contact information
 - [ ] Add contact sync deduplication logic
 
 ---
 
 ## 7. Backend - Messaging System
 
-- [ ] Finalize message storage structure
 - [ ] Implement DM conversation ID generation logic
-- [ ] Implement `GET /v1/messages/list` endpoint
+- [x] Implement `GET /v1/messages/list` endpoint
 - [ ] Calculate unread message counts per DM
-- [ ] Sort DMs by last message timestamp
-- [ ] Implement `after` parameter filtering
-- [ ] Implement `GET /v1/messages/:id/get` endpoint
-- [ ] Fetch messages after specified timestamp/message_id
-- [ ] Fetch reactions separately and merge with messages
-- [ ] Implement message pagination
-- [ ] Implement `POST /v1/messages/:id/send` endpoint
-- [ ] Validate message text length (max 2000 chars)
+- [x] Sort DMs by last message timestamp
+- [x] Implement `after` parameter filtering
+- [x] Implement `GET /v1/messages/:id/get` endpoint
+- [x] Fetch messages after specified timestamp/message_id
+- [x] Fetch reactions separately and merge with messages
+- [x] Implement message pagination
+- [x] Implement `POST /v1/messages/:id/send` endpoint
+- [x] Validate message text length (max 2000 chars)
 - [ ] Implement rate limiting (1 message per second per user)
-- [ ] Generate unique message IDs (UUID v4)
-- [ ] Store messages in `messages` table
+- [x] Generate unique message IDs (UUID v4)
+- [x] Store messages in `messages` table
 - [ ] Implement message reactions system
 - [ ] Create `POST /v1/messages/:id/react` endpoint (optional, for reactions)
-- [ ] Store reactions in `message_reactions` table
-- [ ] Test message sending and retrieval
-- [ ] Test rate limiting functionality
+- [x] Store reactions in `message_reactions` table
 
 ---
 
 ## 8. Backend - Meetup System
 
 - [ ] Design meetup request flow in messages
-- [ ] Implement meetup request creation in message send endpoint
-- [ ] Create meetup record in `meetups` table when request is sent
-- [ ] Implement `POST /v1/messages/:id/meetup` endpoint
+- [x] Implement meetup request creation in message send endpoint (placeholder link)
+- [x] Create meetup record in `meetups` table when request is sent
+- [x] Implement `POST /v1/messages/:id/meetup` endpoint
 - [ ] Validate meetup request exists and is pending
-- [ ] Store exact location (lat/long/alt) for accepted meetups
-- [ ] Update meetup status to accepted
+- [x] Store exact location (lat/long/alt) for accepted meetups
+- [x] Update meetup status to accepted
 - [ ] Implement meetup expiration logic (e.g., 1 hour)
 - [ ] Add cleanup job/cron for expired meetups
 - [ ] Send notifications via WebSocket for meetup requests
-- [ ] Test meetup request and acceptance flow
 
 ---
 
 ## 9. Backend - Media Upload
 
-- [ ] Implement `POST /v1/image/upload` endpoint
-- [ ] Set up multipart form data handling
+- [x] Implement `POST /v1/image/upload` endpoint
+- [x] Set up multipart form data handling
 - [ ] Validate image file type (JPEG, PNG, WebP)
 - [ ] Validate image file size (max 10MB)
 - [ ] Process/optimize images if needed
-- [ ] Integrate with ImgBB API
-- [ ] Handle expiration parameter
-- [ ] Return uploaded image URL
-- [ ] Handle upload errors and retries
-- [ ] Test image upload with various formats and sizes
+- [x] Integrate with ImgBB API
+- [x] Handle expiration parameter
+- [x] Return uploaded image URL
+ - [ ] Handle upload errors and retries
 
 ---
 
