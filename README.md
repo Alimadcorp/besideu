@@ -91,51 +91,27 @@ The app will authenticate users based on phone number only. Later on you can lin
 
 - **POST** `/auth/signup`
 
-  Register a new user account.
+  Register a new user account. Client authenticates with Firebase phone auth first, then sends Firebase ID token to this endpoint.
   
   **Body**: 
   ```json
   {
-    "phone": "string",
+    "firebase_token": "string",
     "username": "string",
-    "real_name": "string",
-    "password": "string"
+    "real_name": "string"
   }
   ```
   
   **Response**: 
   ```json
   {
-    "message": "TOTP code sent via WhatsApp",
-    "expires_in": 300
-  }
-  ```
-  
-  **Error Response**:
-  ```json
-  {
-    "error": "string",
-    "code": "string"
-  }
-  ```
-
-- **POST** `/auth/verify`
-
-  Verify phone number with TOTP code received via WhatsApp.
-  
-  **Body**: 
-  ```json
-  {
-    "phone": "string",
-    "code": "string"
-  }
-  ```
-  
-  **Response**: 
-  ```json
-  {
-    "verified": true,
-    "token": "jwt_token_string"
+    "success": true,
+    "token": "jwt_token_string",
+    "user": {
+      "id": "string",
+      "phone": "string",
+      "username": "string"
+    }
   }
   ```
   
@@ -149,13 +125,12 @@ The app will authenticate users based on phone number only. Later on you can lin
 
 - **POST** `/auth/login`
 
-  Login with phone number and password.
+  Login with Firebase phone authentication. Client authenticates with Firebase first, then sends Firebase ID token to this endpoint.
   
   **Body**: 
   ```json
   {
-    "phone": "string",
-    "password": "string"
+    "firebase_token": "string"
   }
   ```
   
@@ -163,7 +138,12 @@ The app will authenticate users based on phone number only. Later on you can lin
   ```json
   {
     "token": "jwt_token_string",
-    "expires_in": 86400
+    "expires_in": 86400,
+    "user": {
+      "id": "string",
+      "phone": "string",
+      "username": "string"
+    }
   }
   ```
   
@@ -177,9 +157,9 @@ The app will authenticate users based on phone number only. Later on you can lin
 
 #### Protected Endpoints (`/v1`)
 
-The entire `/v1` route will be secured by JWT Bearer Authentication. The current_user will be resolved by reading their verified token. Each of these requests must have `Authorization: Bearer <token>` in their headers.
+The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT token is issued by the API after verifying the Firebase ID token. The current_user will be resolved by reading their verified token. Each of these requests must have `Authorization: Bearer <token>` in their headers.
 
-**JWT Token Format**: Standard JWT with user ID and phone number in payload. Expires after 24 hours.
+**JWT Token Format**: Standard JWT with user ID and phone number in payload. Expires after 24 hours. This token is separate from Firebase tokens and is used for API authentication.
 
 **Error Response Format**:
 ```json
@@ -582,7 +562,7 @@ The following tables will be created in Supabase:
 - `phone` (string, unique, indexed)
 - `username` (string, unique)
 - `real_name` (string)
-- `password_hash` (string)
+- `firebase_uid` (string, unique, indexed) - Firebase user ID
 - `email` (string, nullable)
 - `email_verified` (boolean, default false)
 - `preferences` (JSONB) - Contains `range` (default 5km) and other settings
@@ -662,9 +642,9 @@ All tables will have RLS policies to ensure users can only access their own data
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin operations)
 - `JWT_SECRET` - Secret key for JWT token signing
 - `JWT_EXPIRES_IN` - JWT expiration time (default: 24h)
-- `WHATSAPP_BUSINESS_ACCESS_TOKEN` - WhatsApp Business API access token (Facebook Developers)
-- `WHATSAPP_BUSINESS_PHONE_NUMBER_ID` - WhatsApp Business phone number ID
-- `WHATSAPP_BUSINESS_API_URL` - WhatsApp Business API base URL (default: https://graph.facebook.com/v18.0)
+- `FIREBASE_PROJECT_ID` - Firebase project ID
+- `FIREBASE_CLIENT_EMAIL` - Firebase service account client email
+- `FIREBASE_PRIVATE_KEY` - Firebase service account private key
 - `IMGBB_API_KEY` - ImgBB API key for image uploads
 - `NODE_ENV` - Environment (development/production)
 
@@ -678,31 +658,44 @@ All tables will have RLS policies to ensure users can only access their own data
 ### Frontend Client (`client/`)
 - `EXPO_PUBLIC_API_URL` - API base URL (https://api.besideu.alimad.co)
 - `EXPO_PUBLIC_WS_URL` - WebSocket URL (wss://ws.besideu.alimad.co)
+- `EXPO_PUBLIC_FIREBASE_API_KEY` - Firebase web API key
+- `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` - Firebase auth domain
+- `EXPO_PUBLIC_FIREBASE_PROJECT_ID` - Firebase project ID
 
 ---
 
 ## Authentication Flow
 
-1. **Signup**: User provides phone, username, real_name, and password
-   - Backend generates TOTP code and sends it via WhatsApp Business API
-   - TOTP code expires in 5 minutes (time window for validation)
-
-2. **Verification**: User provides phone and TOTP code (received via WhatsApp)
-   - Backend validates TOTP code using time-based algorithm
-   - If valid, account is created and JWT token is returned
+1. **Signup**: 
+   - Client uses Firebase phone authentication to verify phone number
+   - Firebase sends SMS verification code to user's phone
+   - User enters verification code in Firebase SDK
+   - Client receives Firebase ID token after successful verification
+   - Client sends Firebase ID token to `/auth/signup` with username and real_name
+   - Backend verifies Firebase ID token using Firebase Admin SDK
+   - Backend extracts phone number from Firebase token
+   - Backend creates user account in Supabase
+   - Backend generates and returns JWT token for API authentication
    - User is now authenticated
 
-3. **Login**: User provides phone and password
-   - Backend validates credentials
-   - Returns JWT token (valid for 24 hours)
+2. **Login**: 
+   - Client uses Firebase phone authentication to verify phone number
+   - Firebase sends SMS verification code to user's phone
+   - User enters verification code in Firebase SDK
+   - Client receives Firebase ID token after successful verification
+   - Client sends Firebase ID token to `/auth/login`
+   - Backend verifies Firebase ID token using Firebase Admin SDK
+   - Backend looks up user by phone number in Supabase
+   - Backend generates and returns JWT token (valid for 24 hours)
 
-4. **Protected Routes**: All `/v1/*` endpoints require JWT token in `Authorization: Bearer <token>` header
-   - Token is validated on each request
-   - User context is extracted from token payload
+3. **Protected Routes**: All `/v1/*` endpoints require JWT token in `Authorization: Bearer <token>` header
+   - Token is validated on each request (not Firebase token, but API JWT token)
+   - User context is extracted from JWT token payload
+   - Backend connects to Supabase using service role key for data operations
 
-5. **Token Refresh**: Not implemented in initial version. User must login again after token expires.
+4. **Token Refresh**: Not implemented in initial version. User must login again after token expires.
 
-6. **Logout**: Token is invalidated (stored in blacklist if needed for immediate invalidation)
+5. **Logout**: Token is invalidated (stored in blacklist if needed for immediate invalidation)
 
 ---
 

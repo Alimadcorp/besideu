@@ -6,47 +6,47 @@ This document lists all tasks needed to complete the BesideU application, organi
 
 ## 1. Project Setup & Configuration
 
-- [ ] Set up environment variables for all three services (Supabase, JWT secrets, API keys)
-- [ ] Install dependencies for NextJS API (`web/`)
-- [ ] Install dependencies for Express WebSocket (`socket/`)
-- [ ] Install dependencies for Expo client (`client/`)
-- [ ] Configure Supabase project and obtain API keys
-- [ ] Set up development environment with `.env` files
-- [ ] Configure Git repository and `.gitignore` for environment files
-- [ ] Set up package.json scripts for development workflow
+- [x] Set up environment variables for all three services (Supabase, JWT secrets, API keys)
+- [x] Install dependencies for NextJS API (`web/`)
+- [x] Install dependencies for Express WebSocket (`socket/`)
+- [x] Install dependencies for Expo client (`client/`)
+- [x] Configure Supabase project and obtain API keys
+- [x] Set up development environment with `.env` files
+- [x] Configure Git repository and `.gitignore` for environment files
+- [x] Set up package.json scripts for development workflow
 
 ---
 
 ## 2. Database Schema Design
 
-- [ ] Design `users` table schema in Supabase
-- [ ] Design `user_locations` table schema in Supabase
-- [ ] Design `friends` table schema in Supabase
-- [ ] Design `friend_requests` table schema in Supabase
-- [ ] Design `contacts` table schema in Supabase
-- [ ] Design `messages` table schema in Supabase
-- [ ] Design `message_reactions` table schema in Supabase
-- [ ] Design `meetups` table schema in Supabase
-- [ ] Set up Row Level Security (RLS) policies for all tables
-- [ ] Create indexes for geohash queries on `user_locations`
-- [ ] Create indexes for message retrieval on `messages`
-- [ ] Create indexes for friend lookups on `friends`
-- [ ] Set up database functions/triggers if needed
-- [ ] Test database migrations and rollback procedures
+- [x] Design `users` table schema in Supabase
+- [x] Design `user_locations` table schema in Supabase
+- [x] Design `friends` table schema in Supabase
+- [x] Design `friend_requests` table schema in Supabase
+- [x] Design `contacts` table schema in Supabase
+- [x] Design `messages` table schema in Supabase
+- [x] Design `message_reactions` table schema in Supabase
+- [x] Design `meetups` table schema in Supabase
+- [x] Set up Row Level Security (RLS) policies for all tables
+- [x] Create indexes for geohash queries on `user_locations`
+- [x] Create indexes for message retrieval on `messages`
+- [x] Create indexes for friend lookups on `friends`
+- [x] Set up database functions/triggers if needed
+- [x] Test database migrations and rollback procedures
 
 ---
 
 ## 3. Backend - Authentication System
 
+- [ ] Set up Firebase Admin SDK in NextJS API
+- [ ] Configure Firebase service account credentials
 - [ ] Implement phone number signup endpoint (`POST /auth/signup`)
-- [ ] Integrate WhatsApp Business API (Facebook Developers platform)
-- [ ] Set up WhatsApp Business API credentials and phone number
-- [ ] Implement TOTP (Time-based One-Time Password) generation
-- [ ] Implement verification code endpoint (`POST /auth/verify`)
-- [ ] Send TOTP codes via WhatsApp Business API
-- [ ] Validate TOTP codes with time window tolerance
+- [ ] Verify Firebase ID token from client using Firebase Admin SDK
+- [ ] Extract phone number from verified Firebase token
+- [ ] Create user account in Supabase with Firebase UID
 - [ ] Implement login endpoint (`POST /auth/login`)
-- [ ] Implement password hashing (bcrypt or similar)
+- [ ] Verify Firebase ID token for login
+- [ ] Look up user by phone number or Firebase UID
 - [ ] Generate JWT tokens with user ID and phone in payload
 - [ ] Implement JWT middleware for `/v1` routes
 - [ ] Add JWT token validation and user context extraction
@@ -200,18 +200,23 @@ This document lists all tasks needed to complete the BesideU application, organi
 
 ## 12. Frontend - Authentication Screens
 
+- [ ] Set up Firebase SDK in Expo client
+- [ ] Configure Firebase project credentials
 - [ ] Create signup screen UI
 - [ ] Implement phone number input with validation
 - [ ] Implement username and real_name inputs
-- [ ] Implement password input with strength indicator
-- [ ] Call `/auth/signup` API endpoint
-- [ ] Create verification screen UI
-- [ ] Implement TOTP code input (6-digit code from WhatsApp)
-- [ ] Call `/auth/verify` API endpoint
-- [ ] Store JWT token in SecureStore upon successful verification
+- [ ] Integrate Firebase phone authentication for signup
+- [ ] Handle Firebase SMS verification code input
+- [ ] Get Firebase ID token after phone verification
+- [ ] Call `/auth/signup` API endpoint with Firebase token
+- [ ] Store JWT token in SecureStore upon successful signup
 - [ ] Create login screen UI
-- [ ] Implement phone and password inputs
-- [ ] Call `/auth/login` API endpoint
+- [ ] Implement phone number input
+- [ ] Integrate Firebase phone authentication for login
+- [ ] Handle Firebase SMS verification code input
+- [ ] Get Firebase ID token after phone verification
+- [ ] Call `/auth/login` API endpoint with Firebase token
+- [ ] Store JWT token in SecureStore upon successful login
 - [ ] Implement authentication flow navigation
 - [ ] Create protected route wrapper
 - [ ] Implement automatic token validation on app start
@@ -320,7 +325,7 @@ This document lists all tasks needed to complete the BesideU application, organi
 - [ ] Write unit tests for authentication utilities
 - [ ] Write unit tests for Geohash calculations
 - [ ] Write unit tests for message rate limiting
-- [ ] Write integration tests for auth flow (signup → verify → login)
+- [ ] Write integration tests for auth flow (signup → login)
 - [ ] Write integration tests for friend request flow
 - [ ] Write integration tests for messaging flow
 - [ ] Test WebSocket connection and messaging
@@ -388,4 +393,4 @@ This document lists all tasks needed to complete the BesideU application, organi
 
 ---
 
-**Note**: This TODO list should be updated as tasks are completed. Check off items as you progress through implementation.
+## [ ] We are now reach production.

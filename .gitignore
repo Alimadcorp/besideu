@@ -71,13 +71,14 @@ web_modules/
 
 # Yarn Integrity file
 .yarn-integrity
-
+# Hello, world
 # dotenv environment variable files
 .env
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
+.env.global
 # Allow .env.example files (they should be committed)
 !.env.example
 
