@@ -46,7 +46,10 @@ export default function ChatsScreen() {
     }
   }, []);
 
-  // ...
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchChats();
+  }, [fetchChats]);
 
   useEffect(() => {
     fetchChats();

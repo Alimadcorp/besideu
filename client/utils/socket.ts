@@ -13,6 +13,11 @@ type MessageHandler = (message: WebSocketMessage) => void;
 const listeners: MessageHandler[] = [];
 
 export async function connectWebSocket() {
+    if (typeof WebSocket === 'undefined') {
+        console.log('WebSocket not available in this environment');
+        return;
+    }
+
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
         return;
     }
@@ -83,7 +88,7 @@ export function addSocketListener(callback: MessageHandler) {
 }
 
 export function sendSocketMessage(type: string, payload: any) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (typeof WebSocket !== 'undefined' && ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type, payload }));
     } else {
         console.warn('WebSocket not connected, cannot send message');

@@ -18,6 +18,7 @@ if (fs.existsSync('.env')) {
 
 const PORT = process.env.PORT || 2999;
 const SUPABASE_URL = process.env.SUPABASE_URL;
+console.log(SUPABASE_URL);
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const JWT_SECRET = process.env.JWT_SECRET;
 

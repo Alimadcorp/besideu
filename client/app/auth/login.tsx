@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { StyleSheet, TextInput, Alert, ActivityIndicator, View } from 'react-native';
+import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity } from 'react-native';
 import { useRouter, Link } from 'expo-router';
-import { PhoneAuthProvider, signInWithCredential } from 'firebase/auth';
+import firebase from 'firebase/compat/app';
 import { FirebaseRecaptchaVerifierModal, FirebaseRecaptchaBanner } from 'expo-firebase-recaptcha';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/context/AuthContext';
-import { auth } from '@/utils/firebase';
+import { auth, app } from '@/utils/firebase';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -31,7 +31,7 @@ export default function LoginScreen() {
         }
         setLoading(true);
         try {
-            const phoneProvider = new PhoneAuthProvider(auth);
+            const phoneProvider = new firebase.auth.PhoneAuthProvider();
             const verificationId = await phoneProvider.verifyPhoneNumber(
                 phone,
                 recaptchaVerifier.current!
@@ -53,12 +53,12 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
-            const credential = PhoneAuthProvider.credential(
+            const credential = firebase.auth.PhoneAuthProvider.credential(
                 verificationId,
                 verificationCode
             );
-            const userCredential = await signInWithCredential(auth, credential);
-            const idToken = await userCredential.user.getIdToken();
+            const userCredential = await auth.signInWithCredential(credential);
+            const idToken = await userCredential.user!.getIdToken();
 
             await signIn(idToken);
             // navigation handled in AuthContext/RootLayout
@@ -68,11 +68,16 @@ export default function LoginScreen() {
         }
     };
 
+    // ... (imports remain same)
+
+    // ...
+
     return (
         <ThemedView style={styles.container}>
             <FirebaseRecaptchaVerifierModal
                 ref={recaptchaVerifier}
                 firebaseConfig={auth.app.options}
+                attemptInvisibleVerification={true}
             />
 
             <View style={styles.content}>
@@ -93,13 +98,17 @@ export default function LoginScreen() {
                             value={phone}
                         />
 
-                        <View style={styles.buttonContainer}>
-                            {loading ? <ActivityIndicator color={theme.tint} /> : (
-                                <ThemedText style={[styles.button, { color: theme.tint }]} onPress={sendVerification}>
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={sendVerification}
+                            activeOpacity={0.8}
+                        >
+                            {loading ? <ActivityIndicator color="white" /> : (
+                                <ThemedText style={styles.primaryButtonText}>
                                     Send Verification Code
                                 </ThemedText>
                             )}
-                        </View>
+                        </TouchableOpacity>
                     </>
                 ) : (
                     <>
@@ -113,13 +122,17 @@ export default function LoginScreen() {
                             value={verificationCode}
                         />
 
-                        <View style={styles.buttonContainer}>
-                            {loading ? <ActivityIndicator color={theme.tint} /> : (
-                                <ThemedText style={[styles.button, { color: theme.tint }]} onPress={confirmCode}>
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={confirmCode}
+                            activeOpacity={0.8}
+                        >
+                            {loading ? <ActivityIndicator color="white" /> : (
+                                <ThemedText style={styles.primaryButtonText}>
                                     Confirm Code
                                 </ThemedText>
                             )}
-                        </View>
+                        </TouchableOpacity>
                     </>
                 )}
 
@@ -167,12 +180,25 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         fontSize: 16,
     },
-    buttonContainer: {
+    primaryButton: {
+        backgroundColor: '#000', // Black button
+        height: 50,
+        borderRadius: 8,
+        justifyContent: 'center',
         alignItems: 'center',
         marginTop: 10,
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
-    button: {
-        fontSize: 18,
+    primaryButtonText: {
+        color: '#fff', // White text
+        fontSize: 16,
         fontWeight: 'bold',
     },
     footer: {
