@@ -3,7 +3,7 @@ import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { Image, StyleSheet, View } from "react-native";
 import { ThemedView } from "@/components/themed-view";
-import { setLocation, getLocations } from "../utils/socket";
+import { setLocation, getLocations } from "@/utils/socket";
 
 const fallbackRegion = {
   latitude: 0,
@@ -17,9 +17,9 @@ export default function Map() {
   const [users, setUsers] = useState({}); // {userId: {currentPos, targetPos, progress}}
 
   const DURATION = 200;
-  const easeInOut = (t: number) => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2;
+  const easeInOut = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-  const userId = "user_" + Math.floor(Math.random()*1000);
+  const userId = "user_" + Math.floor(Math.random() * 1000);
 
   // Initialize own position
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function Map() {
   useEffect(() => {
     getLocations((locations: any[]) => {
       setUsers(prev => {
-        const next = {...prev};
+        const next = { ...prev };
         locations.forEach((u: { userId: string | number; latitude: any; longitude: any; }) => {
           if (!next[u.userId]) {
             next[u.userId] = {
@@ -98,14 +98,14 @@ export default function Map() {
       lastTime = now;
 
       setUsers(prev => {
-        const next = {...prev};
+        const next = { ...prev };
         Object.keys(next).forEach(uid => {
           const u = next[uid];
           if (u.progress < 1) {
-            const p = Math.min(u.progress + dt/DURATION, 1);
+            const p = Math.min(u.progress + dt / DURATION, 1);
             u.progress = p;
             const t = easeInOut(p);
-            const lerp = (a: number, b: number) => a + (b-a)*t;
+            const lerp = (a: number, b: number) => a + (b - a) * t;
             u.currentPos = {
               latitude: lerp(u.currentPos.latitude, u.targetPos.latitude),
               longitude: lerp(u.currentPos.longitude, u.targetPos.longitude)

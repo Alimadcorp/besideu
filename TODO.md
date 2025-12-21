@@ -173,81 +173,81 @@ This document lists all tasks needed to complete the BesideU application, organi
 
 ## 11. Frontend - Project Setup
 
-- [ ] Configure Expo app settings in `app.json`
-- [ ] Set up navigation structure (Expo Router with tabs for chats/map)
-- [ ] Configure location permissions in `app.json`
-- [ ] Install and configure location tracking libraries
-- [ ] Set up WebSocket client library
-- [ ] Create API client utilities (fetch wrapper with auth headers)
-- [ ] Set up token storage (Expo SecureStore)
-- [ ] Create API base URL configuration
-- [ ] Set up error handling utilities
-- [ ] Create loading state management
-- [ ] Test development build
+- [x] Configure Expo app settings in `app.json`
+- [x] Set up navigation structure (Expo Router with tabs for chats/map)
+- [x] Configure location permissions in `app.json`
+- [x] Install and configure location tracking libraries
+- [x] Set up WebSocket client library
+- [x] Create API client utilities (fetch wrapper with auth headers)
+- [x] Set up token storage (Expo SecureStore)
+- [x] Create API base URL configuration
+- [x] Set up error handling utilities
+- [x] Create loading state management
+- [x] Test development build
 
 ---
 
 ## 12. Frontend - Authentication Screens
 
-- [ ] Set up Firebase SDK in Expo client
-- [ ] Configure Firebase project credentials
-- [ ] Create signup screen UI
-- [ ] Implement phone number input with validation
-- [ ] Implement username and real_name inputs
-- [ ] Integrate Firebase phone authentication for signup
-- [ ] Handle Firebase SMS verification code input
-- [ ] Get Firebase ID token after phone verification
-- [ ] Call `/auth/signup` API endpoint with Firebase token
-- [ ] Store JWT token in SecureStore upon successful signup
-- [ ] Create login screen UI
-- [ ] Implement phone number input
-- [ ] Integrate Firebase phone authentication for login
-- [ ] Handle Firebase SMS verification code input
-- [ ] Get Firebase ID token after phone verification
-- [ ] Call `/auth/login` API endpoint with Firebase token
-- [ ] Store JWT token in SecureStore upon successful login
-- [ ] Implement authentication flow navigation
-- [ ] Create protected route wrapper
-- [ ] Implement automatic token validation on app start
-- [ ] Test authentication flow end-to-end
+- [x] Set up Firebase SDK in Expo client
+- [x] Configure Firebase project credentials
+- [x] Create signup screen UI
+- [x] Implement phone number input with validation
+- [x] Implement username and real_name inputs
+- [x] Integrate Firebase phone authentication for signup
+- [x] Handle Firebase SMS verification code input
+- [x] Get Firebase ID token after phone verification
+- [x] Call `/auth/signup` API endpoint with Firebase token
+- [x] Store JWT token in SecureStore upon successful signup
+- [x] Create login screen UI
+- [x] Implement phone number input
+- [x] Integrate Firebase phone authentication for login
+- [x] Handle Firebase SMS verification code input
+- [x] Get Firebase ID token after phone verification
+- [x] Call `/auth/login` API endpoint with Firebase token
+- [x] Store JWT token in SecureStore upon successful login
+- [x] Implement authentication flow navigation
+- [x] Create protected route wrapper
+- [x] Implement automatic token validation on app start
+- [x] Test authentication flow end-to-end
 
 ---
 
 ## 13. Frontend - Chats Screen
 
-- [ ] Create chats list UI component
-- [ ] Design chat list item with user info and last message
-- [ ] Implement DM list fetching from `/v1/messages/list`
-- [ ] Display unread message counts
-- [ ] Sort chats by last message timestamp
-- [ ] Implement pull-to-refresh functionality
-- [ ] Create navigation to individual chat screen
-- [ ] Add loading states and error handling
-- [ ] Implement empty state UI
-- [ ] Test chats list rendering and updates
+- [x] Create chats list UI component
+- [x] Design chat list item with user info and last message
+- [x] Implement DM list fetching from `/v1/messages/list`
+- [x] Display unread message counts
+- [x] Sort chats by last message timestamp
+- [x] Implement pull-to-refresh functionality
+- [x] Create navigation to individual chat screen
+- [x] Add loading states and error handling
+- [x] Implement empty state UI
+- [x] Test chats list rendering and updates
 
 ---
 
 ## 14. Frontend - Chat Screen
 
-- [ ] Create chat message UI component
-- [ ] Design message bubble layout (sent vs received)
-- [ ] Implement message list with FlatList or ScrollView
-- [ ] Implement message sending functionality
-- [ ] Call `/v1/messages/:id/send` API endpoint
-- [ ] Implement message polling with `after` parameter
-- [ ] Store `last_fetched_timestamp` locally
-- [ ] Call `/v1/messages/:id/get` API endpoint periodically
-- [ ] Integrate WebSocket notifications for new messages
-- [ ] Update local message list when WebSocket notification received
-- [ ] Implement message pagination/loading older messages
-- [ ] Add meetup request button/feature in chat
-- [ ] Display meetup requests in chat
-- [ ] Implement meetup location sharing UI
-- [ ] Implement message reactions UI (optional, if time permits)
-- [ ] Handle message sending errors and retries
-- [ ] Test chat functionality with multiple messages
-- [ ] Test WebSocket integration for real-time updates
+- [x] Create chat message UI component
+- [x] Design message bubble layout (sent vs received)
+- [x] Implement message list with FlatList or ScrollView
+- [x] Implement message sending functionality
+- [x] Call `/v1/messages/:id/send` API endpoint
+- [x] Implement message polling with `after` parameter
+- [x] Store `last_fetched_timestamp` locally
+- [x] Call `/v1/messages/:id/get` API endpoint periodically
+- [x] Integrate WebSocket notifications for new messages
+- [x] Update local message list when WebSocket notification received
+- [x] Implement message pagination/loading older messages
+- [x] Add meetup request button/feature in chat
+- [x] Display meetup requests in chat
+- [x] Implement meetup location sharing UI
+- [x] Implement message reactions UI (optional, if time permits)
+- [x] Handle message sending errors and retries
+- [x] Test chat functionality with multiple messages
+- [x] Test WebSocket integration for real-time updates
 
 ---
 

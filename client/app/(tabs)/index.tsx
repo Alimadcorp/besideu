@@ -1,53 +1,218 @@
-import { Image } from 'expo-image';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'expo-router';
+import { formatDistanceToNow } from 'date-fns';
 
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import React from 'react';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { apiRequest } from '@/utils/api';
+import { useAuth } from '@/context/AuthContext';
+import { Image } from 'expo-image';
 
-export default function App() {
+type DM = {
+  id: string;
+  user_id: string;
+  username: string;
+  last_message: {
+    text: string;
+    timestamp: string;
+  };
+  unread_count: number;
+  updated_at: string;
+};
+
+import { addSocketListener } from '@/utils/socket';
+
+export default function ChatsScreen() {
+  const [dms, setDms] = useState<DM[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
+
+  const fetchChats = useCallback(async () => {
+    try {
+      const data = await apiRequest('/v1/messages/list');
+      setDms(data.dms);
+    } catch (error) {
+      console.error('Failed to fetch chats:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // ...
+
+  useEffect(() => {
+    fetchChats();
+    // Optional: Set up polling interval as backup
+    const interval = setInterval(fetchChats, 30000);
+
+    const removeListener = addSocketListener((msg) => {
+      if (msg.type === 'new_message') {
+        // efficient: could just update the specific item if payload allows, 
+        // but refreshing list is safer for now to update order and unread count
+        fetchChats();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      removeListener();
+    };
+  }, [fetchChats]);
+
+  const renderItem = ({ item }: { item: DM }) => (
+    <TouchableOpacity
+      style={[styles.chatItem, { borderBottomColor: theme.icon }]}
+      onPress={() => router.push(`/chats/${item.id}` as any)}
+    >
+      <View style={styles.avatarContainer}>
+        <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
+          <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+        </View>
+      </View>
+      <View style={styles.chatInfo}>
+        <View style={styles.chatHeader}>
+          <ThemedText type="defaultSemiBold" style={styles.username}>{item.username}</ThemedText>
+          <ThemedText style={styles.timestamp}>
+            {item.last_message?.timestamp ? formatDistanceToNow(new Date(item.last_message.timestamp), { addSuffix: true }) : ''}
+          </ThemedText>
+        </View>
+        <View style={styles.messagePreview}>
+          <ThemedText numberOfLines={1} style={[styles.messageText, item.unread_count > 0 && styles.unreadMessage]}>
+            {item.last_message?.text || 'No messages yet'}
+          </ThemedText>
+          {item.unread_count > 0 && (
+            <View style={styles.badge}>
+              <ThemedText style={styles.badgeText}>{item.unread_count}</ThemedText>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#ffffffff', dark: '#000000aa' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/react-logo-3x.png')}
-          style={styles.reactLogo}
+    <ThemedView style={styles.container}>
+      <View style={styles.header}>
+        <ThemedText type="title">Chats</ThemedText>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color={theme.tint} style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={dms}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <ThemedText>No conversations yet.</ThemedText>
+              <ThemedText style={styles.emptySubtext}>Find friends on the map or invite contacts!</ThemedText>
+            </View>
+          }
+          contentContainerStyle={dms.length === 0 && styles.emptyList}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">BesideU</ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Connect over the Internet, Physically</ThemedText>
-        <ThemedText>
-          <ThemedText type='defaultSemiBold'>BesideU is a social app designed to bring friends closer, both online and in the real world.</ThemedText>
-        </ThemedText>
-        <ThemedText>Through BesideU, you can chat, share statuses, and manage your friends, just like any other social app, but with a twist: the app gives you a sense of where your friends are nearby. It lets you know when friends are around so you can plan spontaneous meetups. With contacts-based requests, seamless friend management, and location-aware social interactions, BesideU makes it easy to stay connected and aware of the people who matter most.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      )}
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 60, // Safe area
+    paddingBottom: 20,
+  },
+  chatItem: {
     flexDirection: 'row',
+    padding: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  avatarContainer: {
+    marginRight: 15,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'transparent'
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-    backgroundColor: 'transparent'
+  avatarText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
-  reactLogo: {
-    height: 256,
-    width: 256,
-    top: 100,
-    left: 0,
-    position: 'absolute'
+  chatInfo: {
+    flex: 1,
+    justifyContent: 'center',
   },
+  chatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  username: {
+    fontSize: 16,
+  },
+  timestamp: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  messagePreview: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  messageText: {
+    flex: 1,
+    opacity: 0.7,
+    fontSize: 14,
+  },
+  unreadMessage: {
+    fontWeight: 'bold',
+    opacity: 1,
+  },
+  badge: {
+    backgroundColor: '#007AFF', // Or theme.tint
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    marginLeft: 5,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptySubtext: {
+    opacity: 0.6,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  emptyList: {
+    flexGrow: 1,
+  }
 });
