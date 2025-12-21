@@ -580,7 +580,13 @@ The following tables will be created in Supabase:
 - `user_id_1` (UUID, foreign key to users)
 - `user_id_2` (UUID, foreign key to users)
 - `created_at` (timestamp)
-- CHECK constraint: `user_id_1 < user_id_2` (ensures consistent ordering)
+- `last_message` (string, nullable) - Denormalized last message text
+- `last_message_at` (timestamp, nullable, indexed) - Time of last message
+- `last_read_at_1` (timestamp, nullable) - When user_id_1 last read the chat
+- `last_read_at_2` (timestamp, nullable) - When user_id_2 last read the chat
+- `unread_count_1` (integer, default 0) - Unread messages for user_id_1
+- `unread_count_2` (integer, default 0) - Unread messages for user_id_2
+- Check constraint: `user_id_1 < user_id_2` (ensures consistent ordering)
 - Unique constraint on (user_id_1, user_id_2)
 - **Note**: `user_id_1` must always be the smaller UUID to prevent duplicate bidirectional friendships. Application logic must ensure this ordering when creating friendships.
 
@@ -630,6 +636,7 @@ All tables will have RLS policies to ensure users can only access their own data
 - `user_locations.geohash` - For efficient geohash-based queries
 - `user_locations.updated_at` - For finding recently active users
 - `messages.dm_id, timestamp` - Composite index for message retrieval
+- `messages.sender_id, timestamp` - Composite index for rate limiting
 - `friends.user_id_1, user_id_2` - For friend lookup
 
 ---
@@ -652,12 +659,12 @@ All tables will have RLS policies to ensure users can only access their own data
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
 - `JWT_SECRET` - Same JWT secret as NextJS API
-- `PORT` - Server port (default: 3001)
+- `PORT` - Server port (default: 2999)
 - `NODE_ENV` - Environment (development/production)
 
 ### Frontend Client (`client/`)
 - `EXPO_PUBLIC_API_URL` - API base URL (https://api.besideu.alimad.co)
-- `EXPO_PUBLIC_WS_URL` - WebSocket URL (wss://ws.besideu.alimad.co)
+- `EXPO_PUBLIC_WS_URL` - WebSocket URL ([wss://ws.besideu.alimad.co](wss://ws.besideu.alimad.co))
 - `EXPO_PUBLIC_FIREBASE_API_KEY` - Firebase web API key
 - `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` - Firebase auth domain
 - `EXPO_PUBLIC_FIREBASE_PROJECT_ID` - Firebase project ID

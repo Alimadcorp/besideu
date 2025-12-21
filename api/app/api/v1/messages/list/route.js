@@ -13,49 +13,74 @@ export async function GET(req) {
   const limitParam = searchParams.get('limit');
   const offsetParam = searchParams.get('offset');
 
+  // Pagination
+  let limit = Number(limitParam);
+  if (!Number.isFinite(limit) || limit <= 0) limit = 50;
+  limit = Math.min(limit, 100);
+  const offset = Number.isFinite(Number(offsetParam)) && Number(offsetParam) >= 0 ? Number(offsetParam) : 0;
+
   try {
-    // Pull latest message per dm_id where user participated as sender
+    // Query friends table
     let query = supabaseAdmin
-      .from('messages')
-      .select('dm_id, text:last_message, timestamp:last_timestamp')
-      .eq('sender_id', user.id);
+      .from('friends')
+      .select('id, user_id_1, user_id_2, last_message, last_message_at, unread_count_1, unread_count_2')
+      .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`)
+      .order('last_message_at', { ascending: false });
 
     if (after) {
-      query = query.gte('timestamp', after);
+      query = query.gt('last_message_at', after);
     }
 
-    let limit = Number(limitParam);
-    if (!Number.isFinite(limit) || limit <= 0) limit = 50;
-    limit = Math.min(limit, 100);
+    const { data: friendRows, error } = await query.range(offset, offset + limit - 1);
 
-    const offset = Number.isFinite(Number(offsetParam)) && Number(offsetParam) >= 0 ? Number(offsetParam) : 0;
-
-    const { data, error } = await query
-      .order('timestamp', { ascending: false })
-      .range(offset, offset + limit - 1);
     if (error) {
       console.error('[messages/list] fetch', error);
       return NextResponse.json({ error: 'Failed to fetch messages', code: 'supabase_error' }, { status: 500 });
     }
 
-    // Build DM summary list
-    const dms = [];
-    const seen = new Set();
-    for (const row of data || []) {
-      if (seen.has(row.dm_id)) continue;
-      seen.add(row.dm_id);
-      dms.push({
-        id: row.dm_id,
-        user_id: null, // receiver unknown in schema; client should map
-        username: null,
-        last_message: {
-          text: row.text,
-          timestamp: row.timestamp,
-        },
-        unread_count: 0,
-        updated_at: row.timestamp,
-      });
+    if (!friendRows || friendRows.length === 0) {
+       return NextResponse.json({
+          dms: [],
+          pagination: { limit, offset, returned: 0 }
+       });
     }
+
+    // Resolve other users
+    const otherUserIds = new Set();
+    friendRows.forEach(row => {
+      const otherId = row.user_id_1 === user.id ? row.user_id_2 : row.user_id_1;
+      otherUserIds.add(otherId);
+    });
+
+    const { data: usersData, error: usersError } = await supabaseAdmin
+      .from('users')
+      .select('id, username')
+      .in('id', Array.from(otherUserIds));
+    
+    const userMap = {};
+    if (usersData) {
+      usersData.forEach(u => userMap[u.id] = u);
+    }
+
+    // Build response
+    const dms = friendRows.map(row => {
+      const isUser1 = row.user_id_1 === user.id;
+      const otherId = isUser1 ? row.user_id_2 : row.user_id_1;
+      const otherUser = userMap[otherId] || { id: otherId, username: 'Unknown' };
+      const unread = isUser1 ? row.unread_count_1 : row.unread_count_2;
+
+      return {
+        id: row.id,
+        user_id: otherUser.id,
+        username: otherUser.username,
+        last_message: {
+          text: row.last_message || '',
+          timestamp: row.last_message_at || row.created_at, // fallback
+        },
+        unread_count: unread || 0,
+        updated_at: row.last_message_at || row.created_at
+      };
+    });
 
     return NextResponse.json({
       dms,

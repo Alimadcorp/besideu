@@ -91,20 +91,20 @@ This document lists all tasks needed to complete the BesideU application, organi
 
 - [x] Implement `PUT /v1/contacts/set` endpoint
 - [x] Validate contacts data structure
-- [ ] Normalize phone numbers (remove spaces, dashes, handle country codes)
+- [x] Normalize phone numbers (remove spaces, dashes, handle country codes)
 - [x] Store contacts in `contacts` table
 - [x] Match contacts with existing users by phone number
 - [x] Implement `GET /v1/contacts/list` endpoint
 - [x] Return matched users with contact information
-- [ ] Add contact sync deduplication logic
+- [x] Add contact sync deduplication logic
 
 ---
 
 ## 7. Backend - Messaging System
 
-- [ ] Implement DM conversation ID generation logic
+- [x] Implement DM conversation ID generation logic
 - [x] Implement `GET /v1/messages/list` endpoint
-- [ ] Calculate unread message counts per DM
+- [x] Calculate unread message counts per DM
 - [x] Sort DMs by last message timestamp
 - [x] Implement `after` parameter filtering
 - [x] Implement `GET /v1/messages/:id/get` endpoint
@@ -113,27 +113,27 @@ This document lists all tasks needed to complete the BesideU application, organi
 - [x] Implement message pagination
 - [x] Implement `POST /v1/messages/:id/send` endpoint
 - [x] Validate message text length (max 2000 chars)
-- [ ] Implement rate limiting (1 message per second per user)
+- [x] Implement rate limiting (1 message per second per user)
 - [x] Generate unique message IDs (UUID v4)
 - [x] Store messages in `messages` table
-- [ ] Implement message reactions system
-- [ ] Create `POST /v1/messages/:id/react` endpoint (optional, for reactions)
+- [x] Implement message reactions system
+- [x] Create `POST /v1/messages/:id/react` endpoint (optional, for reactions)
 - [x] Store reactions in `message_reactions` table
 
 ---
 
 ## 8. Backend - Meetup System
 
-- [ ] Design meetup request flow in messages
+- [x] Design meetup request flow in messages
 - [x] Implement meetup request creation in message send endpoint (placeholder link)
 - [x] Create meetup record in `meetups` table when request is sent
 - [x] Implement `POST /v1/messages/:id/meetup` endpoint
-- [ ] Validate meetup request exists and is pending
+- [x] Validate meetup request exists and is pending
 - [x] Store exact location (lat/long/alt) for accepted meetups
 - [x] Update meetup status to accepted
-- [ ] Implement meetup expiration logic (e.g., 1 hour)
-- [ ] Add cleanup job/cron for expired meetups
-- [ ] Send notifications via WebSocket for meetup requests
+- [x] Implement meetup expiration logic (e.g., 1 hour)
+- [x] Add cleanup job/cron for expired meetups
+- [x] Send notifications via WebSocket for meetup requests
 
 ---
 
@@ -141,33 +141,33 @@ This document lists all tasks needed to complete the BesideU application, organi
 
 - [x] Implement `POST /v1/image/upload` endpoint
 - [x] Set up multipart form data handling
-- [ ] Validate image file type (JPEG, PNG, WebP)
-- [ ] Validate image file size (max 10MB)
-- [ ] Process/optimize images if needed
+- [x] Validate image file type (JPEG, PNG, WebP)
+- [x] Validate image file size (max 10MB)
+- [x] Process/optimize images if needed
 - [x] Integrate with ImgBB API
 - [x] Handle expiration parameter
 - [x] Return uploaded image URL
- - [ ] Handle upload errors and retries
+- [x] Handle upload errors and retries
 
 ---
 
 ## 10. WebSocket Server (Express)
 
-- [ ] Set up Express server structure in `socket/`
-- [ ] Install WebSocket library (ws or socket.io)
-- [ ] Implement HTTP-to-WebSocket upgrade endpoint
-- [ ] Implement JWT authentication on WebSocket connection
-- [ ] Store connected users with their WebSocket connections
-- [ ] Implement location update broadcasting to nearby users
-- [ ] Set up Supabase real-time subscriptions for database changes
-- [ ] Implement message notification system
-- [ ] Send notifications for: new messages, friend requests, friend acceptances, meetup requests
-- [ ] Implement connection lifecycle handlers (connect, disconnect, reconnection)
-- [ ] Define WebSocket message protocol (message types and formats)
-- [ ] Implement ping/pong keep-alive mechanism
-- [ ] Handle connection errors and reconnection attempts
-- [ ] Test WebSocket connection and message flow
-- [ ] Test with multiple concurrent connections
+- [x] Set up Express server structure in `socket/`
+- [x] Install WebSocket library (ws or socket.io)
+- [x] Implement HTTP-to-WebSocket upgrade endpoint
+- [x] Implement JWT authentication on WebSocket connection
+- [x] Store connected users with their WebSocket connections
+- [x] Implement location update broadcasting to nearby users
+- [x] Set up Supabase real-time subscriptions for database changes
+- [x] Implement message notification system
+- [x] Send notifications for: new messages, friend requests, friend acceptances, meetup requests
+- [x] Implement connection lifecycle handlers (connect, disconnect, reconnection)
+- [x] Define WebSocket message protocol (message types and formats)
+- [x] Implement ping/pong keep-alive mechanism
+- [x] Handle connection errors and reconnection attempts
+- [x] Test WebSocket connection and message flow
+- [x] Test with multiple concurrent connections
 
 ---
 
@@ -273,7 +273,7 @@ This document lists all tasks needed to complete the BesideU application, organi
 ## 16. Frontend - Background Services
 
 - [ ] Implement background location tracking
-- [ ] Set up location update interval (e.g., every 5 minutes)
+- [ ] Set up location update interval (e.g., every 1 minutes)
 - [ ] Throttle location updates to avoid excessive API calls
 - [ ] Set up persistent WebSocket connection
 - [ ] Implement WebSocket reconnection logic

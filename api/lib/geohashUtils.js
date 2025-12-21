@@ -35,4 +35,18 @@ export function getGeohashPrefixLengthForRange(rangeKm) {
   return 3;                     // very rough / large area
 }
 
+/*
 
+let a = ngeohash.encode("12.23334", "23.3499909"), b = ngeohash.encode("12.23334", "23.3499909");
+
+console.log(a, b);
+
+let c = decodeGeohash(a), d = decodeGeohash(b);
+
+console.log(c, d);
+
+let distance = distanceKm(c.lat, c.lon, d.lat, d.lon);
+
+console.log(distance);
+
+//*/
