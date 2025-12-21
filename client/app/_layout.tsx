@@ -44,6 +44,8 @@ function RootLayoutNav() {
   );
 }
 
+import '@/utils/background-location';
+
 export default function RootLayout() {
   return (
     <AuthProvider>

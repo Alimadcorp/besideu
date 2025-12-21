@@ -1,160 +1,249 @@
-import React, { useState, useEffect } from "react";
-import MapView, { Marker } from "react-native-maps";
-import * as Location from "expo-location";
-import { Image, StyleSheet, View } from "react-native";
-import { ThemedView } from "@/components/themed-view";
-import { setLocation, getLocations } from "@/utils/socket";
+import { useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Linking } from 'react-native';
+import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
+import geohash from 'ngeohash';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 
-const fallbackRegion = {
-  latitude: 0,
-  longitude: 0,
-  latitudeDelta: 80,
-  longitudeDelta: 80
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { apiRequest } from '@/utils/api';
+import { useAuth } from '@/context/AuthContext';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+
+import { LOCATION_TASK_NAME } from '@/utils/background-location';
+
+type NearbyUser = {
+  id: string;
+  username: string;
+  distance: number;
+  geohash: string;
 };
 
-export default function Map() {
-  const [region, setRegion] = useState(fallbackRegion);
-  const [users, setUsers] = useState({}); // {userId: {currentPos, targetPos, progress}}
+export default function NearbyScreen() {
+  const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [locationPermission, setLocationPermission] = useState<Location.PermissionStatus | null>(null);
 
-  const DURATION = 200;
-  const easeInOut = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
 
-  const userId = "user_" + Math.floor(Math.random() * 1000);
+  const fetchNearbyUsers = useCallback(async () => {
+    try {
+      const location = await Location.getCurrentPositionAsync({});
+      const hash = geohash.encode(location.coords.latitude, location.coords.longitude);
 
-  // Initialize own position
-  useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-
-      const pos = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = pos.coords;
-
-      setRegion({
-        latitude,
-        longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01
+      // Update our location first
+      await apiRequest('/v1/location/set', {
+        method: 'PUT',
+        body: JSON.stringify({
+          geohash: hash,
+          timestamp: new Date().toISOString(),
+        }),
       });
 
-      setUsers({
-        [userId]: {
-          currentPos: { latitude, longitude },
-          targetPos: { latitude, longitude },
-          progress: 1
-        }
-      });
-
-      setLocation(userId, { latitude, longitude });
-    })();
+      // Find nearby
+      const data = await apiRequest(`/v1/location/find?range=5`); // Default 5km
+      setNearbyUsers(data.users);
+    } catch (error) {
+      console.error('Failed to fetch nearby users:', error);
+      Alert.alert('Error', 'Could not fetch nearby users.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  const handlePress = (e: { nativeEvent: { coordinate: { latitude: any; longitude: any; }; }; }) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
+  const requestPermissions = async () => {
+    const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+    if (foregroundStatus !== 'granted') {
+      Alert.alert('Permission to access location was denied');
+      return;
+    }
 
-    setUsers(prev => ({
-      ...prev,
-      [userId]: {
-        ...prev[userId],
-        targetPos: { latitude, longitude },
-        progress: 0
+    const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+    if (backgroundStatus !== 'granted') {
+      Alert.alert('Permission to access background location was denied');
+      // We can still proceed with foreground features
+    }
+
+    setLocationPermission(foregroundStatus);
+    fetchNearbyUsers();
+
+    // Start background task if granted
+    if (backgroundStatus === 'granted') {
+      const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+      if (!isRegistered) {
+        await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 60000, // 1 minute
+          distanceInterval: 100, // 100 meters
+          foregroundService: {
+            notificationTitle: "BesideU is running",
+            notificationBody: "Updating your location to find nearby friends.",
+          },
+        });
       }
-    }));
-
-    setLocation(userId, { latitude, longitude });
+    }
   };
 
   useEffect(() => {
-    getLocations((locations: any[]) => {
-      setUsers(prev => {
-        const next = { ...prev };
-        locations.forEach((u: { userId: string | number; latitude: any; longitude: any; }) => {
-          if (!next[u.userId]) {
-            next[u.userId] = {
-              currentPos: { latitude: u.latitude, longitude: u.longitude },
-              targetPos: { latitude: u.latitude, longitude: u.longitude },
-              progress: 1
-            };
-          } else {
-            next[u.userId] = {
-              ...next[u.userId],
-              targetPos: { latitude: u.latitude, longitude: u.longitude },
-              progress: 0
-            };
-          }
-        });
-        return next;
-      });
-    });
-  }, []);
+    requestPermissions();
+  }, [fetchNearbyUsers]);
 
-  // Animation loop
-  useEffect(() => {
-    let lastTime = Date.now();
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchNearbyUsers();
+  }, [fetchNearbyUsers]);
 
-    const tick = () => {
-      const now = Date.now();
-      const dt = now - lastTime;
-      lastTime = now;
+  const sendFriendRequest = async (userId: string) => {
+    try {
+      await apiRequest(`/v1/friends/add?user=${userId}`, { method: 'POST' });
+      Alert.alert('Success', 'Friend request sent!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send friend request');
+    }
+  };
 
-      setUsers(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(uid => {
-          const u = next[uid];
-          if (u.progress < 1) {
-            const p = Math.min(u.progress + dt / DURATION, 1);
-            u.progress = p;
-            const t = easeInOut(p);
-            const lerp = (a: number, b: number) => a + (b - a) * t;
-            u.currentPos = {
-              latitude: lerp(u.currentPos.latitude, u.targetPos.latitude),
-              longitude: lerp(u.currentPos.longitude, u.targetPos.longitude)
-            };
-          }
-        });
-        return next;
-      });
-
-      requestAnimationFrame(tick);
-    };
-
-    tick();
-  }, []);
+  const renderItem = ({ item }: { item: NearbyUser }) => (
+    <View style={[styles.userItem, { borderBottomColor: theme.icon }]}>
+      <View style={styles.avatarContainer}>
+        <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
+          <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+        </View>
+      </View>
+      <View style={styles.userInfo}>
+        <ThemedText type="defaultSemiBold" style={styles.username}>{item.username}</ThemedText>
+        <ThemedText style={styles.distance}>
+          {item.distance < 1
+            ? `${Math.round(item.distance * 1000)} m away`
+            : `${item.distance.toFixed(1)} km away`}
+        </ThemedText>
+      </View>
+      <TouchableOpacity
+        style={[styles.actionButton, { backgroundColor: theme.tint }]}
+        onPress={() => sendFriendRequest(item.id)}
+      >
+        <IconSymbol name="plus" size={20} color="white" />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <ThemedView style={styles.container}>
-      <MapView style={styles.map} initialRegion={region} onPress={handlePress}>
-        {Object.keys(users).map(uid => (
-          <Marker key={uid} coordinate={users[uid].currentPos}>
-            <View style={styles.pin}>
-              <Image
-                source={{ uri: "https://http.cat/400.jpg" }}
-                style={styles.avatar}
-              />
+      <View style={styles.header}>
+        <ThemedText type="title">Nearby</ThemedText>
+      </View>
+
+      {!locationPermission ? (
+        <View style={styles.permissionContainer}>
+          <ThemedText>Location permission needed to find nearby friends.</ThemedText>
+          <TouchableOpacity onPress={requestPermissions} style={[styles.permissionButton, { backgroundColor: theme.tint }]}>
+            <ThemedText style={{ color: 'white' }}>Grant Permission</ThemedText>
+          </TouchableOpacity>
+        </View>
+      ) : loading ? (
+        <ActivityIndicator size="large" color={theme.tint} style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={nearbyUsers}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <ThemedText>No users found nearby.</ThemedText>
+              <ThemedText style={styles.emptySubtext}>Try increasing your search range or check back later.</ThemedText>
             </View>
-          </Marker>
-        ))}
-      </MapView>
+          }
+          contentContainerStyle={nearbyUsers.length === 0 && styles.emptyList}
+        />
+      )}
     </ThemedView>
   );
 }
 
+
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { width: "100%", height: "100%" },
-  pin: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "white",
-    borderWidth: 2,
-    borderColor: "#4fffff",
-    justifyContent: "center",
-    alignItems: "center"
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+  },
+  userItem: {
+    flexDirection: 'row',
+    padding: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    marginRight: 15,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 20
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  username: {
+    fontSize: 16,
+  },
+  distance: {
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  actionButton: {
+    padding: 10,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptySubtext: {
+    opacity: 0.6,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  emptyList: {
+    flexGrow: 1,
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  permissionButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8
   }
 });

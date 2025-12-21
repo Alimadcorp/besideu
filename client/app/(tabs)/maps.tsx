@@ -1,1 +1,1 @@
-export { default } from "./maps.web";
+export { default } from "./maps.native";

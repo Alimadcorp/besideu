@@ -253,58 +253,58 @@ This document lists all tasks needed to complete the BesideU application, organi
 
 ## 15. Frontend - Map/Nearby Screen
 
-- [ ] Create nearby users list UI component
-- [ ] Design user item with distance display
-- [ ] Implement location fetching using device GPS
-- [ ] Convert GPS coordinates to Geohash
-- [ ] Call `/v1/location/set` API endpoint periodically
-- [ ] Call `/v1/location/find` API endpoint
-- [ ] Display distance calculations (kilometers)
-- [ ] Add user filtering options (friends only, etc.)
-- [ ] Display user preferences (range) in UI
-- [ ] Allow user to adjust their visibility range
-- [ ] Handle location permission requests
-- [ ] Handle location errors and fallbacks
-- [ ] Implement pull-to-refresh for nearby users
-- [ ] Test location accuracy and distance display
+- [x] Create nearby users list UI component
+- [x] Design user item with distance display
+- [x] Implement location fetching using device GPS
+- [x] Convert GPS coordinates to Geohash
+- [x] Call `/v1/location/set` API endpoint periodically
+- [x] Call `/v1/location/find` API endpoint
+- [x] Display distance calculations (kilometers)
+- [x] Add user filtering options (friends only, etc.)
+- [x] Display user preferences (range) in UI
+- [x] Allow user to adjust their visibility range
+- [x] Handle location permission requests
+- [x] Handle location errors and fallbacks
+- [x] Implement pull-to-refresh for nearby users
+- [x] Test location accuracy and distance display
 
 ---
 
 ## 16. Frontend - Background Services
 
-- [ ] Implement background location tracking
-- [ ] Set up location update interval (e.g., every 1 minutes)
-- [ ] Throttle location updates to avoid excessive API calls
-- [ ] Set up persistent WebSocket connection
-- [ ] Implement WebSocket reconnection logic
-- [ ] Handle app state changes (foreground/background)
-- [ ] Pause/resume location updates based on app state
-- [ ] Implement background task for location updates (if needed)
-- [ ] Handle WebSocket disconnections and reconnections
-- [ ] Test background location tracking
-- [ ] Test WebSocket connection stability
+- [x] Implement background location tracking
+- [x] Set up location update interval (e.g., every 1 minutes)
+- [x] Throttle location updates to avoid excessive API calls
+- [x] Set up persistent WebSocket connection
+- [x] Implement WebSocket reconnection logic
+- [x] Handle app state changes (foreground/background)
+- [x] Pause/resume location updates based on app state
+- [x] Implement background task for location updates (if needed)
+- [x] Handle WebSocket disconnections and reconnections
+- [x] Test background location tracking
+- [x] Test WebSocket connection stability
 
 ---
 
 ## 17. Frontend - Friends & Contacts
 
-- [ ] Create friends list UI screen
-- [ ] Fetch and display user's friends
-- [ ] Create friend requests screen UI
-- [ ] Display incoming and outgoing friend requests
-- [ ] Implement accept friend request functionality
-- [ ] Call `/v1/friends/accept` API endpoint
-- [ ] Implement decline/remove friend request functionality
-- [ ] Call `/v1/friends/remove` API endpoint
-- [ ] Implement contact sync functionality
-- [ ] Request device contacts permission
-- [ ] Format contacts data and call `/v1/contacts/set` API endpoint
-- [ ] Display matched contacts from `/v1/contacts/list`
-- [ ] Create add friend flow from contacts
-- [ ] Call `/v1/friends/add` API endpoint
-- [ ] Handle friend request notifications via WebSocket
-- [ ] Update UI when friend request notifications received
-- [ ] Test friends and contacts functionality
+- [x] Create friends list UI screen
+- [x] Fetch and display user's friends
+- [x] Create friend requests screen UI
+- [x] Display incoming and outgoing friend requests
+- [x] Implement accept friend request functionality
+- [x] Call `/v1/friends/accept` API endpoint
+- [x] Implement decline/remove friend request functionality
+- [x] Call `/v1/friends/remove` API endpoint
+- [x] Implement contact sync functionality
+- [x] Request device contacts permission
+- [x] Format contacts data and call `/v1/contacts/set` API endpoint
+- [x] Display matched contacts from `/v1/contacts/list`
+- [x] Create add friend flow from contacts
+- [x] Call `/v1/friends/add` API endpoint
+- [x] Handle friend request notifications via WebSocket
+- [x] Update UI when friend request notifications received
+- [x] Test friends and contacts functionality
 
 ---
 
