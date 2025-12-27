@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await storeUser(data.user);
             setUser(data.user);
             connectWebSocket();
-            router.replace('/(tabs)');
+            // Navigation handled by RootLayout useEffect when user state changes
         } catch (error) {
             console.error('Sign in failed', error);
             throw error;
@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await storeUser(data.user);
             setUser(data.user);
             connectWebSocket();
-            router.replace('/(tabs)');
+            // Navigation handled by RootLayout useEffect
         } catch (error) {
             console.error('Sign up failed', error);
             throw error;

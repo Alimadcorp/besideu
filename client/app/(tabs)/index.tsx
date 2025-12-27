@@ -35,16 +35,21 @@ export default function ChatsScreen() {
   const { user } = useAuth();
 
   const fetchChats = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const data = await apiRequest('/v1/messages/list');
-      setDms(data.dms);
+      setDms(data.dms || []);
     } catch (error) {
       console.error('Failed to fetch chats:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -52,6 +57,8 @@ export default function ChatsScreen() {
   }, [fetchChats]);
 
   useEffect(() => {
+    if (!user) return;
+
     fetchChats();
     // Optional: Set up polling interval as backup
     const interval = setInterval(fetchChats, 30000);
@@ -68,7 +75,7 @@ export default function ChatsScreen() {
       clearInterval(interval);
       removeListener();
     };
-  }, [fetchChats]);
+  }, [fetchChats, user]);
 
   const renderItem = ({ item }: { item: DM }) => (
     <TouchableOpacity

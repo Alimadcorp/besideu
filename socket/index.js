@@ -4,8 +4,6 @@ import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
-
-// Load environment variables locally
 if (fs.existsSync('.env')) {
   const envConfig = fs.readFileSync('.env').toString();
   for (const line of envConfig.split('\n')) {
@@ -18,7 +16,6 @@ if (fs.existsSync('.env')) {
 
 const PORT = process.env.PORT || 2999;
 const SUPABASE_URL = process.env.SUPABASE_URL;
-console.log(SUPABASE_URL);
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -32,10 +29,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const app = express();
 const wsInstance = expressWs(app);
 
-// Clients map: userId -> Set<WebSocket>
 const textClients = new Map();
 
-// Authentication Helper
 const verifyToken = (token) => {
   try {
     return jwt.verify(token, JWT_SECRET);
@@ -46,21 +41,16 @@ const verifyToken = (token) => {
 
 app.use(express.json());
 
-// WebSocket Endpoint
 app.ws('/', (ws, req) => {
   let user = null;
-
-  // Authenticate
-  // Try Authorization header first (if supported by client/proxy)
   let token = req.headers['authorization']?.replace('Bearer ', '');
-  // Fallback to query param
   if (!token && req.query?.token) {
     token = req.query.token;
   }
 
   if (token) {
     const decoded = verifyToken(token);
-    if (decoded && decoded.sub) { // Assuming 'sub' is user_id, or payload.id
+    if (decoded && decoded.sub) {
        user = decoded;
     } else if (decoded && decoded.id) {
        user = decoded;

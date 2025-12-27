@@ -31,6 +31,11 @@ export default function LoginScreen() {
         }
         setLoading(true);
         try {
+            // Monkey patch for missing _reset method in older expo-firebase-recaptcha
+            if (recaptchaVerifier.current && !(recaptchaVerifier.current as any)._reset) {
+                (recaptchaVerifier.current as any)._reset = () => { };
+            }
+
             const phoneProvider = new firebase.auth.PhoneAuthProvider();
             const verificationId = await phoneProvider.verifyPhoneNumber(
                 phone,
@@ -77,7 +82,7 @@ export default function LoginScreen() {
             <FirebaseRecaptchaVerifierModal
                 ref={recaptchaVerifier}
                 firebaseConfig={auth.app.options}
-                attemptInvisibleVerification={true}
+            // attemptInvisibleVerification={true} // Disabled to fix INVALID_APP_CREDENTIAL
             />
 
             <View style={styles.content}>

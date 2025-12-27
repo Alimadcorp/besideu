@@ -35,7 +35,6 @@ export async function POST(req) {
       );
     }
 
-    // Check if user already exists
     const { data: existingUserByPhone, error: existingPhoneErr } = await supabaseAdmin
       .from('users')
       .select('*')
@@ -51,7 +50,6 @@ export async function POST(req) {
     }
 
     if (existingUserByPhone) {
-      // If user exists, just issue JWT (idempotent signup)
       const token = signAuthToken({
         sub: existingUserByPhone.id,
         phone: existingUserByPhone.phone,
@@ -69,7 +67,6 @@ export async function POST(req) {
       });
     }
 
-    // Ensure username is not taken
     const { data: existingUserByUsername, error: existingUsernameErr } = await supabaseAdmin
       .from('users')
       .select('id')
@@ -91,7 +88,6 @@ export async function POST(req) {
       );
     }
 
-    // Create new user
     const { data: newUser, error: insertErr } = await supabaseAdmin
       .from('users')
       .insert({

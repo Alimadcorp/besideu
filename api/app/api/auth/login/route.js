@@ -34,7 +34,6 @@ export async function POST(req) {
       );
     }
 
-    // Find user by phone or firebase_uid
     const { data: user, error } = await supabaseAdmin
       .from('users')
       .select('*')

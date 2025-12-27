@@ -6,7 +6,7 @@ const ALLOWED = [
     "https://besideu.alimad.co"
 ];
 
-export function middleware(req) {
+export default function proxy(req) {
     const origin = req.headers.get("origin");
     const res = NextResponse.next();
 
