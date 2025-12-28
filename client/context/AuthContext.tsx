@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getToken, setToken, removeToken, getUser, setUser as storeUser } from '@/utils/storage';
-import { apiRequest } from '@/utils/api';
+import { apiRequest, setOnUnauthorizedCallback } from '@/utils/api';
 import { router } from 'expo-router';
 import { connectWebSocket, disconnectWebSocket } from '@/utils/socket';
 
@@ -36,6 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         checkAuth();
+        setOnUnauthorizedCallback(() => {
+            signOut();
+        });
     }, []);
 
     async function checkAuth() {

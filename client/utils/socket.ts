@@ -1,8 +1,11 @@
 import { getToken } from './storage';
+import { hashLocation } from './crypto';
 
 let ws: WebSocket | null = null;
 let reconnectInterval: NodeJS.Timeout | null = null;
-const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'wss://ws.besideu.alimad.co';
+
+// Base WebSocket URL
+const WS_URL_BASE = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:2999';
 
 type WebSocketMessage = {
     type: string;
@@ -12,9 +15,22 @@ type WebSocketMessage = {
 type MessageHandler = (message: WebSocketMessage) => void;
 const listeners: MessageHandler[] = [];
 
+/**
+ * Ensures the WebSocket URL is correctly formatted with a trailing slash and token
+ */
+function getFormattedUrl(token: string): string {
+    // Ensure the base URL ends with a slash if it doesn't have one and doesn't have a query
+    let base = WS_URL_BASE;
+    if (!base.includes('?') && !base.endsWith('/')) {
+        base += '/';
+    }
+
+    const separator = base.includes('?') ? '&' : '?';
+    return `${base}${separator}token=${encodeURIComponent(token)}`;
+}
+
 export async function connectWebSocket() {
     if (typeof WebSocket === 'undefined') {
-        console.log('WebSocket not available in this environment');
         return;
     }
 
@@ -24,51 +40,58 @@ export async function connectWebSocket() {
 
     const token = await getToken();
     if (!token) {
-        console.log('No token found, skipping WebSocket connection');
+        // console.log('[Socket] No token, skipping connection');
         return;
     }
 
-    // @ts-ignore - WebSocket in React Native supports headers in 3rd argument
-    ws = new WebSocket(WS_URL, [], {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    });
+    try {
+        const fullUrl = getFormattedUrl(token);
+        // console.log(`[Socket] Connecting to ${WS_URL_BASE}...`);
 
-    ws.onopen = () => {
-        console.log('WebSocket Connected');
-        if (reconnectInterval) {
-            clearInterval(reconnectInterval);
-            reconnectInterval = null;
-        }
-    };
+        // Use a safe wrapper for WebSocket to handle potential handshake errors
+        ws = new WebSocket(fullUrl);
 
-    ws.onmessage = (e) => {
-        try {
-            const message = JSON.parse(e.data);
-            listeners.forEach(listener => listener(message));
-        } catch (err) {
-            console.error('Failed to parse WebSocket message', err);
-        }
-    };
+        ws.onopen = () => {
+            // console.log('[Socket] Connected Successfully');
+            if (reconnectInterval) {
+                clearInterval(reconnectInterval);
+                reconnectInterval = null;
+            }
+        };
 
-    ws.onclose = () => {
-        console.log('WebSocket Disconnected');
-        ws = null;
-        // Attempt reconnection
-        if (!reconnectInterval) {
-            reconnectInterval = setInterval(connectWebSocket, 5000) as any;
-        }
-    };
+        ws.onmessage = (e) => {
+            try {
+                const message = JSON.parse(e.data);
+                listeners.forEach(listener => listener(message));
+            } catch (err) {
+                // console.error('[Socket] Parse error:', err);
+            }
+        };
 
-    ws.onerror = (e) => {
-        console.error('WebSocket Error', e);
-    };
+        ws.onclose = (e) => {
+            // console.log(`[Socket] Closed (Code: ${e.code}, Reason: ${e.reason || 'none'})`);
+            ws = null;
+
+            // Only reconnect if we didn't close manually and it's not an auth error (4001)
+            if (!reconnectInterval && e.code !== 4001) {
+                // console.log('[Socket] Scheduling reconnect...');
+                reconnectInterval = setInterval(connectWebSocket, 5000);
+            }
+        };
+
+        ws.onerror = (e) => {
+            // Silenced error
+            // console.error('[Socket] Connection error');
+        };
+    } catch (err) {
+        // Silenced error
+        // console.error('[Socket] Setup error:', err);
+    }
 }
 
 export function disconnectWebSocket() {
     if (ws) {
-        ws.close();
+        ws.close(1000, 'User logged out');
         ws = null;
     }
     if (reconnectInterval) {
@@ -88,25 +111,18 @@ export function addSocketListener(callback: MessageHandler) {
 }
 
 export function sendSocketMessage(type: string, payload: any) {
-    if (typeof WebSocket !== 'undefined' && ws && ws.readyState === WebSocket.OPEN) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type, payload }));
     } else {
-        console.warn('WebSocket not connected, cannot send message');
+        // console.warn('[Socket] Message not sent: Not connected');
     }
 }
 
-// Mock functions for maps.native.tsx compatibility until fully implemented
-export const setLocation = (userId: string, pos: any) => {
-    // Send location update to server
-    sendSocketMessage('location_update', {
-        geohash: 'TODO', // We need to convert pos to geohash
-        timestamp: new Date().toISOString(),
-        // ... other data if protocol allows
-    });
-};
-
-export const getLocations = (cb: any) => {
-    // This looks like it was expecting a callback driven subscription
-    // We can map specific listener types to this callback if needed
-    // For now, just a placeholder
+export const updateSocketLocation = (lat: number, lon: number) => {
+    try {
+        const location_hash = hashLocation(lat, lon);
+        sendSocketMessage('location_update', { location_hash });
+    } catch (e) {
+        // Silent fail
+    }
 };

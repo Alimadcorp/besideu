@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../../lib/supabaseClient';
 import { getCurrentUserFromRequest } from '../../../../../lib/authUser';
-import { decodeGeohash, distanceKm, getGeohashPrefixLengthForRange } from '../../../../../lib/geohashUtils';
 
 export async function GET(req) {
   try {
@@ -23,27 +22,10 @@ export async function GET(req) {
       ? Number(rangeParam)
       : null;
 
-    // Get current user preferences (for default range)
-    let effectiveRangeKm = rangeKm;
-    if (!effectiveRangeKm) {
-      const { data: userRow, error: userErr } = await supabaseAdmin
-        .from('users')
-        .select('preferences')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (userErr) {
-        console.error('[location/find] Error fetching user preferences', userErr);
-      }
-
-      const defaultRange = userRow?.preferences?.range;
-      effectiveRangeKm = typeof defaultRange === 'number' && defaultRange > 0 ? defaultRange : 5;
-    }
-
-    // Get current user location
+    // Fetch current user's location hash
     const { data: locationRow, error: locErr } = await supabaseAdmin
       .from('user_locations')
-      .select('geohash')
+      .select('location_hash')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -55,31 +37,25 @@ export async function GET(req) {
       );
     }
 
-    if (!locationRow?.geohash) {
+    if (!locationRow?.location_hash) {
       return NextResponse.json(
         { error: 'Current user location not set', code: 'location_not_set' },
         { status: 400 },
       );
     }
 
-    const originHash = locationRow.geohash;
-    const originCoords = decodeGeohash(originHash);
-    if (!originCoords) {
-      return NextResponse.json(
-        { error: 'Failed to decode current location geohash', code: 'decode_error' },
-        { status: 500 },
-      );
-    }
+    const myLocationHash = locationRow.location_hash;
 
-    const prefixLen = getGeohashPrefixLengthForRange(effectiveRangeKm);
-    const prefix = originHash.slice(0, prefixLen);
+    // Fetch users with the SAME location hash (same region)
+    // We cannot determine distance > 0 because hashing is one-way.
+    // So "range" parameter is effectively ignored or treated as "same region" if small enough.
+    // In future, client could send neighbor hashes to check larger areas.
 
-    // Fetch candidate users with similar geohash prefix
     const { data: candidates, error: candidatesErr } = await supabaseAdmin
       .from('user_locations')
-      .select('user_id, geohash, users ( username )')
+      .select('user_id, location_hash, users!inner ( username, real_name, preferences )')
       .neq('user_id', user.id)
-      .like('geohash', `${prefix}%`);
+      .eq('location_hash', myLocationHash);
 
     if (candidatesErr) {
       console.error('[location/find] Error fetching nearby users', candidatesErr);
@@ -92,31 +68,23 @@ export async function GET(req) {
     const users = [];
 
     for (const row of candidates || []) {
-      const coords = decodeGeohash(row.geohash);
-      if (!coords) continue;
+      // Filter out users who disabled location sharing
+      if (row.users?.preferences?.share_location === false) continue;
 
-      const dist = distanceKm(
-        originCoords.lat,
-        originCoords.lon,
-        coords.lat,
-        coords.lon,
-      );
-
-      if (dist <= effectiveRangeKm) {
-        users.push({
-          id: row.user_id,
-          username: row.users?.username || null,
-          distance: dist,
-          geohash: row.geohash,
-        });
-      }
+      users.push({
+        id: row.user_id,
+        username: row.users?.username || null,
+        real_name: row.users?.real_name || null,
+        distance: 'near', // Fuzzy distance as per new privacy spec
+        location_hash: row.location_hash,
+      });
     }
 
     // Optionally filter by friend status etc. (placeholder for now)
     // if (filter === 'friends_only') { ... }
 
-    // Sort by distance ascending
-    users.sort((a, b) => a.distance - b.distance);
+    // Users in same region, no specific sort order available by distance
+    // Could sort by recently active if updated_at was fetched
 
     // Simple pagination on the in-memory list
     const pageSize = Math.max(1, Math.min(100, Number(pageSizeParam) || 50));

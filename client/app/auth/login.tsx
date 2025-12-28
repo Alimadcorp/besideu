@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity } from 'react-native';
-import { useRouter, Link } from 'expo-router';
-import firebase from 'firebase/compat/app';
-import { FirebaseRecaptchaVerifierModal, FirebaseRecaptchaBanner } from 'expo-firebase-recaptcha';
+import { Link } from 'expo-router';
+import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/context/AuthContext';
-import { auth, app } from '@/utils/firebase';
+import { auth, firebase, PhoneAuthProvider } from '@/utils/firebase';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -18,7 +17,6 @@ export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
 
     const { signIn } = useAuth();
-    const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
@@ -31,12 +29,11 @@ export default function LoginScreen() {
         }
         setLoading(true);
         try {
-            // Monkey patch for missing _reset method in older expo-firebase-recaptcha
             if (recaptchaVerifier.current && !(recaptchaVerifier.current as any)._reset) {
                 (recaptchaVerifier.current as any)._reset = () => { };
             }
 
-            const phoneProvider = new firebase.auth.PhoneAuthProvider();
+            const phoneProvider = new PhoneAuthProvider();
             const verificationId = await phoneProvider.verifyPhoneNumber(
                 phone,
                 recaptchaVerifier.current!
@@ -45,6 +42,7 @@ export default function LoginScreen() {
             Alert.alert('Success', 'Verification code has been sent to your phone.');
         } catch (err: any) {
             Alert.alert('Error', err.message);
+            console.error(err);
         } finally {
             setLoading(false);
         }
@@ -66,23 +64,19 @@ export default function LoginScreen() {
             const idToken = await userCredential.user!.getIdToken();
 
             await signIn(idToken);
-            // navigation handled in AuthContext/RootLayout
         } catch (err: any) {
             Alert.alert('Error', `Login failed: ${err.message}`);
+            console.error(err);
+        } finally {
             setLoading(false);
         }
     };
-
-    // ... (imports remain same)
-
-    // ...
 
     return (
         <ThemedView style={styles.container}>
             <FirebaseRecaptchaVerifierModal
                 ref={recaptchaVerifier}
-                firebaseConfig={auth.app.options}
-            // attemptInvisibleVerification={true} // Disabled to fix INVALID_APP_CREDENTIAL
+                firebaseConfig={firebase.app().options}
             />
 
             <View style={styles.content}>
@@ -186,7 +180,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     primaryButton: {
-        backgroundColor: '#000', // Black button
+        backgroundColor: '#000',
         height: 50,
         borderRadius: 8,
         justifyContent: 'center',
@@ -202,7 +196,7 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     primaryButtonText: {
-        color: '#fff', // White text
+        color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',
     },

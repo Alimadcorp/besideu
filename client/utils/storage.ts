@@ -1,7 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 

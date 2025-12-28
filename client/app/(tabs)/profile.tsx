@@ -1,4 +1,4 @@
-import { StyleSheet, Switch, TouchableOpacity, ScrollView, Alert, View } from 'react-native';
+import { StyleSheet, Switch, TouchableOpacity, ScrollView, Alert, View, ActivityIndicator } from 'react-native';
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -9,15 +9,65 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/context/AuthContext';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { apiRequest } from '@/utils/api';
 
 export default function ProfileScreen() {
-    const { user, signOut } = useAuth();
+    const { user: authUser, signOut } = useAuth();
     const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
-    const [locationEnabled, setLocationEnabled] = useState(true); // Sync with actual preference later
-    const [range, setRange] = useState(5); // Sync with actual preference later
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [profile, setProfile] = useState<any>(null);
+    const [locationEnabled, setLocationEnabled] = useState(true);
+    const [range, setRange] = useState(5);
+
+    React.useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    async function fetchProfile() {
+        try {
+            const data = await apiRequest('/v1/user/me');
+            setProfile(data.user);
+            const prefs = data.user.preferences || {};
+            setLocationEnabled(prefs.share_location !== false);
+            setRange(prefs.range || 5);
+        } catch (error) {
+            console.error('Failed to fetch profile', error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function updateProfile(updates: any) {
+        setSaving(true);
+        try {
+            const data = await apiRequest('/v1/user/settings', {
+                method: 'PUT',
+                body: JSON.stringify(updates)
+            });
+            if (data.success) {
+                setProfile((prev: any) => ({ ...prev, ...data.user }));
+            }
+        } catch (error) {
+            console.error('Failed to update profile', error);
+            Alert.alert('Error', 'Failed to update profile');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    const toggleLocation = (value: boolean) => {
+        setLocationEnabled(value);
+        updateProfile({ preferences: { range, share_location: value } });
+    };
+
+    const updateRange = (newRange: number) => {
+        setRange(newRange);
+        updateProfile({ preferences: { range: newRange, share_location: locationEnabled } });
+    }
 
     const handleLogout = async () => {
         Alert.alert(
@@ -42,6 +92,16 @@ export default function ProfileScreen() {
         router.push('/friends' as any);
     }
 
+    if (loading) {
+        return (
+            <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={theme.tint} />
+            </ThemedView>
+        );
+    }
+
+    const user = profile || authUser;
+
     return (
         <ThemedView style={styles.container}>
             <ScrollView contentContainerStyle={styles.content}>
@@ -50,38 +110,113 @@ export default function ProfileScreen() {
                 <View style={styles.header}>
                     <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
                         <ThemedText style={styles.avatarText}>
-                            {user?.username?.charAt(0).toUpperCase() || 'U'}
+                            {(user?.username?.charAt(0).toUpperCase() + user?.username?.charAt(1).toLowerCase()) || 'U'}
                         </ThemedText>
                     </View>
                     <ThemedText type="title" style={styles.username}>
                         {user?.real_name || 'User'}
                     </ThemedText>
                     <ThemedText style={styles.handle}>@{user?.username}</ThemedText>
+                    {saving && <ThemedText style={{ fontSize: 12, color: theme.tint, marginTop: 5 }}>Saving...</ThemedText>}
+                </View>
+
+                {/* Account Section */}
+                <View style={styles.section}>
+                    <ThemedText type="subtitle" style={styles.sectionTitle}>Account</ThemedText>
+
+                    <TouchableOpacity
+                        style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                        onPress={() => {
+                            Alert.prompt(
+                                'Change Name',
+                                'Enter your full name',
+                                (name) => {
+                                    if (name) updateProfile({ real_name: name });
+                                },
+                                'plain-text',
+                                user?.real_name
+                            );
+                        }}
+                    >
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Full Name</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>{user?.real_name}</ThemedText>
+                        </View>
+                        <IconSymbol name="pencil" size={16} color={theme.icon} />
+                    </TouchableOpacity>
+
+                    <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Username</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>@{user?.username}</ThemedText>
+                        </View>
+                        <ThemedText style={[styles.rowValue, { fontSize: 12 }]}>Locked</ThemedText>
+                    </View>
+
+                    <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Phone Number</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>{user?.phone}</ThemedText>
+                        </View>
+                        <IconSymbol name="phone" size={16} color={theme.icon} />
+                    </View>
+
+                    <TouchableOpacity
+                        style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                        onPress={() => {
+                            Alert.prompt(
+                                'Change Email',
+                                'Enter your email address',
+                                (email) => {
+                                    if (email) updateProfile({ email });
+                                },
+                                'plain-text',
+                                user?.email
+                            );
+                        }}
+                    >
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Email</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>{user?.email || 'Not set'}</ThemedText>
+                        </View>
+                        <IconSymbol name="envelope" size={16} color={theme.icon} />
+                    </TouchableOpacity>
                 </View>
 
                 {/* Settings Section */}
                 <View style={styles.section}>
                     <ThemedText type="subtitle" style={styles.sectionTitle}>Preferences</ThemedText>
 
-                    <View style={[styles.row, { borderBottomColor: theme.icon }]}>
+                    <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
                         <ThemedText style={styles.rowLabel}>Share Location</ThemedText>
                         <Switch
                             value={locationEnabled}
-                            onValueChange={setLocationEnabled}
+                            onValueChange={toggleLocation}
                             trackColor={{ false: '#767577', true: theme.tint }}
+                            disabled={saving}
                         />
                     </View>
 
-                    {/* Slider placeholder for Radius */}
-                    <View style={[styles.row, { borderBottomColor: theme.icon }]}>
+                    <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
                         <View>
                             <ThemedText style={styles.rowLabel}>Discovery Radius</ThemedText>
                             <ThemedText style={styles.rowSubtext}>{range} km</ThemedText>
                         </View>
-                        {/* Add Slider here if needed, or buttons */}
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                            <TouchableOpacity onPress={() => setRange(Math.max(1, range - 1))}><ThemedText>-</ThemedText></TouchableOpacity>
-                            <TouchableOpacity onPress={() => setRange(Math.min(50, range + 1))}><ThemedText>+</ThemedText></TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 15, alignItems: 'center' }}>
+                            <TouchableOpacity
+                                onPress={() => updateRange(Math.max(1, range - 1))}
+                                disabled={saving}
+                                style={[styles.rangeBtn, { backgroundColor: theme.icon + '20' }]}
+                            >
+                                <ThemedText style={styles.rangeBtnText}>-</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => updateRange(Math.min(50, range + 1))}
+                                disabled={saving}
+                                style={[styles.rangeBtn, { backgroundColor: theme.icon + '20' }]}
+                            >
+                                <ThemedText style={styles.rangeBtnText}>+</ThemedText>
+                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
@@ -156,8 +291,8 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     avatarText: {
-        color: 'white',
-        fontSize: 40,
+        color: '#000',
+        fontSize: 50,
         fontWeight: 'bold',
     },
     username: {
@@ -210,5 +345,16 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         opacity: 0.5,
         textAlign: 'center',
+    },
+    rangeBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    rangeBtnText: {
+        fontSize: 20,
+        fontWeight: 'bold',
     }
 });

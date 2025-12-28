@@ -81,7 +81,7 @@ It will not show a map, it will show a list of the nearby users. User can only s
 
 ### NextJS App API
 
-This app will work on the app router, and will expose many API methods to allow users to perform operations. We will store only the Geohash of all the users in the server, and use that to find neighboring users. We can use the exact location only when a `meetup` is requested.
+This app will work on the app router, and will expose many API methods to allow users to perform operations. We will store only a custom privacy-preserving hash of the location of all the users in the server, and use that to find neighboring users. We can use the exact location only when a `meetup` is requested.
 
 **Base URL**: `https://api.besideu.alimad.co`
 
@@ -174,12 +174,12 @@ The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT tok
 
 - **PUT** `/v1/location/set`
 
-  Set your location (store the user's Geohash only in the server).
+  Set your location (store the user's location hash only in the server).
   
   **Body**: 
   ```json
   {
-    "geohash": "string",
+    "location_hash": "string",
     "timestamp": "ISO8601_string",
     "meta": {
       "upload_reason": "string (optional)",
@@ -198,7 +198,7 @@ The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT tok
 
 - **GET** `/v1/location/find`
 
-  Get other users in your `range` (kilometers) based on Geohash distance.
+  Get other users in your `range` (kilometers) based on location hash proximity.
   
   **Query Parameters**: 
   - `range?` (number, in kilometers) - If none provided, defaults to `current_user.preference.range`
@@ -211,14 +211,14 @@ The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT tok
       {
         "id": "string",
         "username": "string",
-        "distance": "number (km)",
-        "geohash": "string"
+        "distance": "near|far",
+        "location_hash": "string"
       }
     ]
   }
   ```
 
-**Geohash**: Uses precision level 7-9 characters for distance calculations (approximately 150m to 5km accuracy). Stored as string in database.
+**Location Hash**: A custom hash generated from the location. It is a one-way hash that cannot be decrypted back into coordinates, but allows determining if users are in the same region.
 
 ##### Friends Endpoints
 
@@ -306,7 +306,7 @@ The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT tok
     "contacts": [
       {
         "name": "string",
-        "phone": ["string"]
+        "phone_hash": ["string"]
       }
     ],
     "length": "number",
@@ -345,7 +345,7 @@ The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT tok
   }
   ```
 
-**Contact Matching**: Phone numbers are normalized (removed spaces, dashes, country code matching) before comparison. Privacy settings may hide some users from contact matching.
+**Contact Matching**: Phone numbers are normalized in the format `+Code'nPhone` (e.g. `+24123912319`) and then hashed before uploading. The server receives and compares these hashes. Privacy settings may hide some users from contact matching.
 
 ##### Messages Endpoints
 
@@ -525,7 +525,7 @@ The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT tok
 {
   "type": "location_update",
   "payload": {
-    "geohash": "string",
+    "location_hash": "string",
     "timestamp": "ISO8601_string"
   }
 }
@@ -572,7 +572,7 @@ The following tables will be created in Supabase:
 ### `user_locations`
 - `id` (UUID, primary key)
 - `user_id` (UUID, foreign key to users)
-- `geohash` (string, indexed)
+- `location_hash` (string, indexed)
 - `updated_at` (timestamp, indexed)
 
 ### `friends`
@@ -633,7 +633,7 @@ The following tables will be created in Supabase:
 All tables will have RLS policies to ensure users can only access their own data and data they're authorized to see (friends, messages, etc.).
 
 ### Indexes
-- `user_locations.geohash` - For efficient geohash-based queries
+- `user_locations.location_hash` - For efficient hash-based queries
 - `user_locations.updated_at` - For finding recently active users
 - `messages.dm_id, timestamp` - Composite index for message retrieval
 - `messages.sender_id, timestamp` - Composite index for rate limiting

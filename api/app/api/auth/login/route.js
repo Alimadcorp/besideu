@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebaseAdmin';
 import { supabaseAdmin } from '../../../../lib/supabaseClient';
 import { signAuthToken } from '../../../../lib/jwt';
+import { hashPhone } from '../../../../lib/crypto';
 
 export async function POST(req) {
   try {
@@ -55,6 +56,15 @@ export async function POST(req) {
       );
     }
 
+    // Backfill phone_hash if missing (for privacy-focused discovery)
+    if (!user.phone_hash) {
+      const phoneHash = hashPhone(phone);
+      await supabaseAdmin
+        .from('users')
+        .update({ phone_hash: phoneHash })
+        .eq('id', user.id);
+    }
+
     const token = signAuthToken({
       sub: user.id,
       phone: user.phone,
@@ -78,5 +88,3 @@ export async function POST(req) {
     );
   }
 }
-
-

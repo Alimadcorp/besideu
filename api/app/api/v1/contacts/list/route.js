@@ -11,9 +11,8 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const userFilter = searchParams.get('user');
-    const phoneFilter = searchParams.get('phone');
 
-    // Load contacts data
+    // Load contacts data (which now contains hashes)
     const { data: contactsRow, error: contactsErr } = await supabaseAdmin
       .from('contacts')
       .select('contacts_data')
@@ -26,39 +25,36 @@ export async function GET(req) {
     }
 
     const contactsData = contactsRow?.contacts_data || [];
-    const phones = new Set();
-    const nameByPhone = {};
+    const hashes = new Set();
+    const nameByHash = {};
+
     for (const c of contactsData) {
       const name = c.name || null;
-      if (Array.isArray(c.phone)) {
-        for (const p of c.phone) {
-          if (typeof p === 'string' && p.trim()) {
-            phones.add(p.trim());
-            nameByPhone[p.trim()] = name;
-          }
+      const rawPhones = Array.isArray(c.phone) ? c.phone : [c.phone];
+      for (const h of rawPhones) {
+        if (typeof h === 'string' && h.length === 64) {
+          hashes.add(h);
+          nameByHash[h] = name;
         }
-      } else if (typeof c.phone === 'string' && c.phone.trim()) {
-        phones.add(c.phone.trim());
-        nameByPhone[c.phone.trim()] = name;
       }
     }
 
     let matched = [];
-    if (phones.size || userFilter || phoneFilter) {
-      const phoneList = phoneFilter ? [phoneFilter] : Array.from(phones);
+    if (hashes.size || userFilter) {
+      const hashList = Array.from(hashes);
       const filters = [];
       if (userFilter) filters.push(`id.eq.${userFilter}`);
-      if (phoneList.length) filters.push(`phone.in.(${phoneList.map((p) => `"${p}"`).join(',')})`);
+      if (hashList.length) filters.push(`phone_hash.in.(${hashList.map((h) => `"${h}"`).join(',')})`);
 
       const { data: users, error: usersErr } = await supabaseAdmin
         .from('users')
-        .select('id, username, phone')
+        .select('id, username, phone_hash')
         .or(filters.join(','));
 
       if (usersErr) {
         console.error('[contacts/list] fetch users', usersErr);
       } else {
-        // Load friendships for current user once, to compute is_friend
+        // Load friendships to compute is_friend
         const { data: friendships, error: friendsErr } = await supabaseAdmin
           .from('friends')
           .select('user_id_1, user_id_2')
@@ -77,8 +73,8 @@ export async function GET(req) {
         matched = (users || []).map((u) => ({
           user_id: u.id,
           username: u.username,
-          phone: u.phone,
-          contact_name: nameByPhone[u.phone] || null,
+          // We no longer return the phone number for privacy, the client uses username anyway
+          contact_name: nameByHash[u.phone_hash] || null,
           is_friend: friendIds.has(u.id),
         }));
       }
@@ -90,5 +86,3 @@ export async function GET(req) {
     return NextResponse.json({ error: 'Unexpected error', code: 'internal_error' }, { status: 500 });
   }
 }
-
-

@@ -19,9 +19,16 @@ const MAPPING = {
   'location.fill': 'location-pin',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
-  'chevron.right': 'chevron-right',
   'bubble.left.fill': 'chat',
   'person.fill': 'person',
+  'pencil': 'edit',
+  'phone': 'phone',
+  'envelope': 'mail',
+  'plus': 'add',
+  'arrow.up.circle.fill': 'arrow-circle-up',
+  'checkmark': 'check',
+  'xmark': 'close',
+  'chevron.right': 'chevron-right',
 } as IconMapping;
 
 /**

@@ -17,11 +17,12 @@ export async function PUT(req) {
     }
 
     const body = await req.json();
-    const { geohash, timestamp, meta } = body || {};
+    const { location_hash, timestamp, meta } = body || {};
 
-    if (!isValidGeohash(geohash)) {
+    // Validate location_hash (SHA-256 hex string)
+    if (!location_hash || typeof location_hash !== 'string' || location_hash.length !== 64) {
       return NextResponse.json(
-        { error: 'Invalid geohash', code: 'invalid_geohash' },
+        { error: 'Invalid location hash', code: 'invalid_hash' },
         { status: 400 },
       );
     }
@@ -32,7 +33,7 @@ export async function PUT(req) {
       .upsert(
         {
           user_id: user.id,
-          geohash,
+          location_hash,
           updated_at: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
         },
         { onConflict: 'user_id' },

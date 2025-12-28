@@ -68,8 +68,17 @@ This document lists all tasks needed to complete the BesideU application, organi
 - [x] Add pagination for location find results
 
 ---
-
-## 5. Backend - Friends System
+ 
+## 5. Backend - User Profile & Settings
+ 
+- [x] Implement `GET /v1/user/me` endpoint to fetch current profile
+- [x] Implement `PUT /v1/user/settings` endpoint to update profile and preferences
+- [x] Support `real_name`, `email`, and `preferences` (JSONB)
+- [x] Integrate `share_location` preference in `location/find` results
+ 
+---
+ 
+## 6. Backend - Friends System
 
 - [x] Implement `POST /v1/friends/add` endpoint
 - [x] Validate user exists and is not already a friend

@@ -12,53 +12,39 @@ export async function PUT(req) {
     const body = await req.json();
     const { contacts, length, timestamp } = body || {};
 
-    if (!Array.isArray(contacts) || !contacts.length) {
+    if (!Array.isArray(contacts)) {
       return NextResponse.json({ error: 'contacts array is required', code: 'bad_request' }, { status: 400 });
     }
 
-    const contactCount = Number.isFinite(Number(length)) ? Number(length) : contacts.length;
-
-    // Helper to normalize phone
-    const normalizePhone = (p) => {
-      if (!p) return '';
-      // Remove spaces, dashes, parentheses. Keep + and digits.
-      return p.replace(/[\s\-\(\)]/g, '');
-    };
-
-    // Normalize contacts and collect phones
+    // Process incoming contacts (already hashed on client side)
     const normalizedContacts = [];
-    const phones = new Set();
-    const seenContactKeys = new Set(); // To avoid exact duplicate entries if client sends them
+    const phoneHashes = new Set();
+    const seenContactKeys = new Set();
 
     for (const c of contacts) {
       if (!c.name && (!c.phone || c.phone.length === 0)) continue;
-      
-      const entryCallbackPhones = [];
-      const rawPhones = Array.isArray(c.phone) ? c.phone : [c.phone];
-      
-      for (const p of rawPhones) {
-         if (typeof p === 'string') {
-            const norm = normalizePhone(p);
-            if (norm.length > 3) { // rudimentary validation
-              phones.add(norm);
-              entryCallbackPhones.push(norm);
-            }
-         }
+
+      const entryCallbackHashes = [];
+      const incomingHashes = Array.isArray(c.phone) ? c.phone : [c.phone];
+
+      for (const h of incomingHashes) {
+        if (typeof h === 'string' && h.length === 64) { // SHA-256 hex length
+          phoneHashes.add(h);
+          entryCallbackHashes.push(h);
+        }
       }
 
-      // Deduplicate phones within this contact
-      const uniqueEntryPhones = Array.from(new Set(entryCallbackPhones));
-      
-      if (uniqueEntryPhones.length > 0) {
-         // Create a key to check if we already have this contact in this batch (simple name+phones check)
-         const key = `${c.name || ''}:${uniqueEntryPhones.sort().join(',')}`;
-         if (!seenContactKeys.has(key)) {
-            seenContactKeys.add(key);
-            normalizedContacts.push({
-              name: c.name,
-              phone: uniqueEntryPhones
-            });
-         }
+      const uniqueEntryHashes = Array.from(new Set(entryCallbackHashes));
+
+      if (uniqueEntryHashes.length > 0) {
+        const key = `${c.name || ''}:${uniqueEntryHashes.sort().join(',')}`;
+        if (!seenContactKeys.has(key)) {
+          seenContactKeys.add(key);
+          normalizedContacts.push({
+            name: c.name,
+            phone: uniqueEntryHashes // Storing hashes for privacy
+          });
+        }
       }
     }
 
@@ -80,16 +66,16 @@ export async function PUT(req) {
       return NextResponse.json({ error: 'Failed to store contacts', code: 'supabase_error' }, { status: 500 });
     }
 
-    // Collect phone numbers to match users
-    // (Already collected in `phones` Set)
-    const uniquePhones = Array.from(phones);
-
+    // Match users by phone_hash instead of cleartext phone
+    const uniqueHashes = Array.from(phoneHashes);
     let matchedUsers = [];
-    if (uniquePhones.length) {
+
+    if (uniqueHashes.length) {
       const { data: matched, error: matchErr } = await supabaseAdmin
         .from('users')
         .select('id')
-        .in('phone', uniquePhones);
+        .in('phone_hash', uniqueHashes);
+
       if (matchErr) {
         console.error('[contacts/set] match', matchErr);
       } else {
@@ -99,7 +85,7 @@ export async function PUT(req) {
 
     return NextResponse.json({
       success: true,
-      length: contactCount,
+      length: normalizedContacts.length,
       matched_users: matchedUsers,
       last_synced_at: upserted.last_synced_at,
     });
@@ -108,5 +94,3 @@ export async function PUT(req) {
     return NextResponse.json({ error: 'Unexpected error', code: 'internal_error' }, { status: 500 });
   }
 }
-
-

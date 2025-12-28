@@ -32,16 +32,17 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 // I'll try catching `/v1/friends/list` if it fails fallback to contacts. 
 // Actually I'll just check `GET /v1/contacts/list`
 
-type ContactUser = {
-    user_id: string;
+type Friend = {
+    id: string; // dm_id
+    friend_id: string;
     username: string;
-    phone: string;
-    contact_name: string;
-    is_friend: boolean;
+    real_name?: string;
+    last_message?: string;
+    unread_count: number;
 };
 
 export default function FriendsScreen() {
-    const [friends, setFriends] = useState<ContactUser[]>([]);
+    const [friends, setFriends] = useState<Friend[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -51,12 +52,8 @@ export default function FriendsScreen() {
 
     const fetchFriends = useCallback(async () => {
         try {
-            // Trying contacts list for now as a proxy for friends list if they are in contacts
-            // Ideally we should have a dedicated friends list endpoint.
-            // Let's assume for MVP contacts/list gives us friends.
-            const data = await apiRequest('/v1/contacts/list');
-            const allContacts: ContactUser[] = data.matched;
-            setFriends(allContacts.filter(c => c.is_friend));
+            const data = await apiRequest('/v1/friends/list');
+            setFriends(data.friends || []);
         } catch (error) {
             console.error('Failed to fetch friends:', error);
         } finally {
@@ -74,15 +71,11 @@ export default function FriendsScreen() {
         fetchFriends();
     }, [fetchFriends]);
 
-    const renderItem = ({ item }: { item: ContactUser }) => (
+    const renderItem = ({ item }: { item: Friend }) => (
         <TouchableOpacity
             style={[styles.item, { borderBottomColor: theme.icon }]}
             onPress={() => {
-                // Check for existing DM or create one?
-                // For now just show alert or go to profile? 
-                // We don't have profile screen.
-                // Maybe go to chat?
-                Alert.alert('Friend', item.username);
+                router.push(`/chats/${item.id}` as any);
             }}
         >
             <View style={styles.avatarContainer}>
@@ -91,11 +84,17 @@ export default function FriendsScreen() {
                 </View>
             </View>
             <View style={styles.userInfo}>
-                <ThemedText type="defaultSemiBold" style={styles.username}>{item.contact_name || item.username}</ThemedText>
-                <ThemedText style={styles.phone}>{item.username}</ThemedText>
+                <ThemedText type="defaultSemiBold" style={styles.username}>
+                    {item.real_name || item.username}
+                </ThemedText>
+                {item.real_name && <ThemedText style={styles.phone}>@{item.username}</ThemedText>}
             </View>
             <View style={styles.actions}>
-                {/* Message Button */}
+                {item.unread_count > 0 && (
+                    <View style={[styles.badge, { backgroundColor: theme.tint }]}>
+                        <ThemedText style={styles.badgeText}>{item.unread_count}</ThemedText>
+                    </View>
+                )}
             </View>
         </TouchableOpacity>
     );
@@ -121,7 +120,7 @@ export default function FriendsScreen() {
             ) : (
                 <FlatList
                     data={friends}
-                    keyExtractor={item => item.user_id}
+                    keyExtractor={item => item.id}
                     renderItem={renderItem}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                     ListEmptyComponent={

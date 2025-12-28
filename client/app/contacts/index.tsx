@@ -9,6 +9,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiRequest } from '@/utils/api';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { hashPhone } from '@/utils/crypto';
 
 type ContactUser = {
     user_id: string;
@@ -48,10 +49,10 @@ export default function ContactsScreen() {
                 });
 
                 if (data.length > 0) {
-                    // Format contacts for API
+                    // Format contacts for API - Hashing for privacy!
                     const formattedContacts = data.map(c => ({
                         name: c.name || 'Unknown',
-                        phone: c.phoneNumbers?.map(p => p.number).filter(Boolean) || []
+                        phone: c.phoneNumbers?.map(p => hashPhone(p.number || '')).filter(Boolean) || []
                     })).filter(c => c.phone.length > 0);
 
                     await apiRequest('/v1/contacts/set', {

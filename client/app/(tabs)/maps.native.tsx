@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Linking } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import geohash from 'ngeohash';
+// import geohash from 'ngeohash'; // Removed
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
@@ -12,6 +12,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiRequest } from '@/utils/api';
+import { hashLocation } from '@/utils/crypto';
 import { useAuth } from '@/context/AuthContext';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
@@ -20,8 +21,9 @@ import { LOCATION_TASK_NAME } from '@/utils/background-location';
 type NearbyUser = {
   id: string;
   username: string;
-  distance: number;
-  geohash: string;
+  real_name?: string;
+  distance: string; // 'near' | 'far'
+  location_hash: string;
 };
 
 export default function NearbyScreen() {
@@ -38,19 +40,23 @@ export default function NearbyScreen() {
   const fetchNearbyUsers = useCallback(async () => {
     try {
       const location = await Location.getCurrentPositionAsync({});
-      const hash = geohash.encode(location.coords.latitude, location.coords.longitude);
+      const hash = hashLocation(location.coords.latitude, location.coords.longitude);
 
       // Update our location first
       await apiRequest('/v1/location/set', {
         method: 'PUT',
         body: JSON.stringify({
-          geohash: hash,
+          location_hash: hash,
           timestamp: new Date().toISOString(),
         }),
       });
 
+      // Get user preference for range
+      const profileData = await apiRequest('/v1/user/me');
+      const preferredRange = profileData.user?.preferences?.range || 5;
+
       // Find nearby
-      const data = await apiRequest(`/v1/location/find?range=5`); // Default 5km
+      const data = await apiRequest(`/v1/location/find?range=${preferredRange}`);
       setNearbyUsers(data.users);
     } catch (error) {
       console.error('Failed to fetch nearby users:', error);
@@ -120,11 +126,12 @@ export default function NearbyScreen() {
         </View>
       </View>
       <View style={styles.userInfo}>
-        <ThemedText type="defaultSemiBold" style={styles.username}>{item.username}</ThemedText>
+        <ThemedText type="defaultSemiBold" style={styles.username}>
+          {item.real_name || item.username}
+        </ThemedText>
+        {item.real_name && <ThemedText style={{ fontSize: 12, opacity: 0.6 }}>@{item.username}</ThemedText>}
         <ThemedText style={styles.distance}>
-          {item.distance < 1
-            ? `${Math.round(item.distance * 1000)} m away`
-            : `${item.distance.toFixed(1)} km away`}
+          {item.distance === 'near' ? 'Near you' : 'Far away'}
         </ThemedText>
       </View>
       <TouchableOpacity

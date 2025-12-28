@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     firebase_uid TEXT NOT NULL UNIQUE,
     email TEXT,
     email_verified BOOLEAN DEFAULT FALSE,
-    preferences JSONB DEFAULT '{"range": 5}'::jsonb,
+    preferences JSONB DEFAULT '{"range": 5, "share_location": true}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

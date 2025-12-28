@@ -87,21 +87,29 @@ export default function ChatScreen() {
         }
     }, [id]);
 
+    const markAsRead = useCallback(async () => {
+        try {
+            await apiRequest(`/v1/messages/${id}/read`, { method: 'POST' });
+        } catch (error) {
+            console.error('Failed to mark as read:', error);
+        }
+    }, [id]);
+
     useEffect(() => {
-        fetchMessages();
+        fetchMessages().then(() => markAsRead());
 
         const removeListener = addSocketListener((msg) => {
             if (msg.type === 'new_message' && msg.payload.dm_id === id) {
                 console.log('New message received via socket', msg);
                 // Fetch new messages since last known timestamp
-                fetchMessages(lastMessageTimestamp.current);
+                fetchMessages(lastMessageTimestamp.current).then(() => markAsRead());
             }
         });
 
         return () => {
             removeListener();
         };
-    }, [fetchMessages, id]);
+    }, [fetchMessages, id, markAsRead]);
 
     const sendMessage = async () => {
         if (!inputText.trim()) return;
