@@ -41,16 +41,43 @@ export async function POST(req) {
     // check duplicate pending
     const { data: existingReq, error: reqErr } = await supabaseAdmin
       .from('friend_requests')
-      .select('id,status')
-      .eq('from_user_id', user.id)
-      .eq('to_user_id', targetUserId)
+      .select('id,status,from_user_id')
+      .or(`and(from_user_id.eq.${user.id},to_user_id.eq.${targetUserId}),and(from_user_id.eq.${targetUserId},to_user_id.eq.${user.id})`)
       .maybeSingle();
+
     if (reqErr) {
       console.error('[friends/add] check request', reqErr);
       return NextResponse.json({ error: 'Internal error', code: 'supabase_error' }, { status: 500 });
     }
-    if (existingReq && existingReq.status === 'pending') {
-      return NextResponse.json({ error: 'Request already pending', code: 'request_exists' }, { status: 409 });
+
+    if (existingReq) {
+      if (existingReq.status === 'accepted') {
+        return NextResponse.json({ error: 'Already friends', code: 'already_friends' }, { status: 409 });
+      }
+      if (existingReq.status === 'pending') {
+        if (existingReq.from_user_id === user.id) {
+          return NextResponse.json({ error: 'Request already pending', code: 'request_exists' }, { status: 409 });
+        } else {
+          // Implicitly accept the INCOMING request from the target user
+          const [u1, u2] = orderPair(user.id, targetUserId);
+          const { data: friendRow, error: friendErr } = await supabaseAdmin
+            .from('friends')
+            .insert({ user_id_1: u1, user_id_2: u2 })
+            .select('id')
+            .single();
+
+          if (friendErr) {
+            return NextResponse.json({ error: 'Failed to accept mutual request', code: 'create_failed' }, { status: 500 });
+          }
+
+          await supabaseAdmin
+            .from('friend_requests')
+            .update({ status: 'accepted' })
+            .eq('id', existingReq.id);
+
+          return NextResponse.json({ success: true, friendship_id: friendRow.id, message: 'Mutual request accepted' });
+        }
+      }
     }
 
     const { data, error } = await supabaseAdmin

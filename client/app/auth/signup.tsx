@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 
@@ -74,93 +74,98 @@ export default function SignupScreen() {
 
     return (
         <ThemedView style={styles.container}>
-            <FirebaseRecaptchaVerifierModal
-                ref={recaptchaVerifier}
-                firebaseConfig={firebase.app().options}
-            />
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1, justifyContent: 'center' }}
+            >
+                <FirebaseRecaptchaVerifierModal
+                    ref={recaptchaVerifier}
+                    firebaseConfig={firebase.app().options}
+                />
 
-            <View style={styles.content}>
-                <ThemedText type="title" style={styles.title}>Create Account</ThemedText>
-                <ThemedText style={styles.subtitle}>Join BesideU today</ThemedText>
+                <View style={styles.content}>
+                    <ThemedText type="title" style={styles.title}>Create Account</ThemedText>
+                    <ThemedText style={styles.subtitle}>Join BesideU today</ThemedText>
 
-                {!verificationId ? (
-                    <>
-                        <ThemedText style={styles.label}>Real Name</ThemedText>
-                        <TextInput
-                            style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                            placeholder="John Doe"
-                            placeholderTextColor="#888"
-                            onChangeText={setRealName}
-                            value={realName}
-                        />
+                    {!verificationId ? (
+                        <>
+                            <ThemedText style={styles.label}>Real Name</ThemedText>
+                            <TextInput
+                                style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
+                                placeholder="John Doe"
+                                placeholderTextColor="#888"
+                                onChangeText={setRealName}
+                                value={realName}
+                            />
 
-                        <ThemedText style={styles.label}>Username</ThemedText>
-                        <TextInput
-                            style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                            placeholder="johndoe"
-                            placeholderTextColor="#888"
-                            autoCapitalize="none"
-                            onChangeText={setUsername}
-                            value={username}
-                        />
+                            <ThemedText style={styles.label}>Username</ThemedText>
+                            <TextInput
+                                style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
+                                placeholder="johndoe"
+                                placeholderTextColor="#888"
+                                autoCapitalize="none"
+                                onChangeText={setUsername}
+                                value={username}
+                            />
 
-                        <ThemedText style={styles.label}>Phone Number</ThemedText>
-                        <TextInput
-                            style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                            placeholder="+1234567890"
-                            placeholderTextColor="#888"
-                            autoComplete="tel"
-                            keyboardType="phone-pad"
-                            textContentType="telephoneNumber"
-                            onChangeText={setPhone}
-                            value={phone}
-                        />
+                            <ThemedText style={styles.label}>Phone Number</ThemedText>
+                            <TextInput
+                                style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
+                                placeholder="+1234567890"
+                                placeholderTextColor="#888"
+                                autoComplete="tel"
+                                keyboardType="phone-pad"
+                                textContentType="telephoneNumber"
+                                onChangeText={setPhone}
+                                value={phone}
+                            />
 
-                        <TouchableOpacity
-                            style={styles.primaryButton}
-                            onPress={sendVerification}
-                            activeOpacity={0.8}
-                        >
-                            {loading ? <ActivityIndicator color="white" /> : (
-                                <ThemedText style={styles.primaryButtonText}>
-                                    Send Verification Code
-                                </ThemedText>
-                            )}
-                        </TouchableOpacity>
-                    </>
-                ) : (
-                    <>
-                        <ThemedText style={styles.label}>Verification Code</ThemedText>
-                        <TextInput
-                            style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                            placeholder="123456"
-                            placeholderTextColor="#888"
-                            keyboardType="number-pad"
-                            onChangeText={setVerificationCode}
-                            value={verificationCode}
-                        />
+                            <TouchableOpacity
+                                style={styles.primaryButton}
+                                onPress={sendVerification}
+                                activeOpacity={0.8}
+                            >
+                                {loading ? <ActivityIndicator color="white" /> : (
+                                    <ThemedText style={styles.primaryButtonText}>
+                                        Send Verification Code
+                                    </ThemedText>
+                                )}
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <>
+                            <ThemedText style={styles.label}>Verification Code</ThemedText>
+                            <TextInput
+                                style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
+                                placeholder="123456"
+                                placeholderTextColor="#888"
+                                keyboardType="number-pad"
+                                onChangeText={setVerificationCode}
+                                value={verificationCode}
+                            />
 
-                        <TouchableOpacity
-                            style={styles.primaryButton}
-                            onPress={confirmCode}
-                            activeOpacity={0.8}
-                        >
-                            {loading ? <ActivityIndicator color="white" /> : (
-                                <ThemedText style={styles.primaryButtonText}>
-                                    Confirm Code
-                                </ThemedText>
-                            )}
-                        </TouchableOpacity>
-                    </>
-                )}
+                            <TouchableOpacity
+                                style={styles.primaryButton}
+                                onPress={confirmCode}
+                                activeOpacity={0.8}
+                            >
+                                {loading ? <ActivityIndicator color="white" /> : (
+                                    <ThemedText style={styles.primaryButtonText}>
+                                        Confirm Code
+                                    </ThemedText>
+                                )}
+                            </TouchableOpacity>
+                        </>
+                    )}
 
-                <View style={styles.footer}>
-                    <ThemedText>Already have an account? </ThemedText>
-                    <Link href="/auth/login">
-                        <ThemedText style={{ color: theme.tint, fontWeight: 'bold' }}>Sign In</ThemedText>
-                    </Link>
+                    <View style={styles.footer}>
+                        <ThemedText>Already have an account? </ThemedText>
+                        <Link href="/auth/login">
+                            <ThemedText style={{ color: theme.tint, fontWeight: 'bold' }}>Sign In</ThemedText>
+                        </Link>
+                    </View>
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </ThemedView>
     );
 }

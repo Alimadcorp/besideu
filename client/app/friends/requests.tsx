@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
@@ -101,7 +101,10 @@ export default function FriendRequestsScreen() {
             {loading ? (
                 <ActivityIndicator size="large" color={theme.tint} style={{ marginTop: 20 }} />
             ) : (
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh}>
+                <ScrollView
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    style={{ flex: 1 }}
+                >
                     <View style={styles.sectionHeader}>
                         <ThemedText type="subtitle">Incoming ({requests.incoming.length})</ThemedText>
                     </View>
@@ -123,7 +126,7 @@ export default function FriendRequestsScreen() {
                         renderItem={({ item }) => renderItem({ item, type: 'outgoing' })}
                         scrollEnabled={false}
                     />
-                </RefreshControl>
+                </ScrollView>
             )}
         </ThemedView>
     );

@@ -76,7 +76,7 @@ export async function GET(req) {
         username: row.users?.username || null,
         real_name: row.users?.real_name || null,
         distance: 'near', // Fuzzy distance as per new privacy spec
-        location_hash: row.location_hash,
+        // location_hash: row.location_hash, // REMOVED: Do not expose hash to client for non-friends to ensure fuzzy-only perception
       });
     }
 

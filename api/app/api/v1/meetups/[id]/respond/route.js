@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../../lib/supabaseClient';
-import { getCurrentUserFromRequest } from '../../../../../lib/authUser';
+import { supabaseAdmin } from '../../../../../../lib/supabaseClient';
+import { getCurrentUserFromRequest } from '../../../../../../lib/authUser';
 
 export async function POST(req, { params }) {
+    const { id: meetupId } = await params;
     const { user, error: authError } = await getCurrentUserFromRequest(req);
     if (!user) {
         return NextResponse.json({ error: authError || 'Unauthorized', code: 'unauthorized' }, { status: 401 });
     }
 
-    const meetupId = params?.id;
-    if (!meetupId) {
-        return NextResponse.json({ error: 'meetup id required', code: 'bad_request' }, { status: 400 });
-    }
+
 
     try {
         const { action, location } = await req.json();

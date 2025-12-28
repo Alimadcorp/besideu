@@ -15,7 +15,8 @@ CREATE INDEX IF NOT EXISTS idx_users_phone_hash ON users(phone_hash);
 ALTER TABLE user_locations ADD COLUMN IF NOT EXISTS location_hash TEXT;
 CREATE INDEX IF NOT EXISTS idx_user_locations_location_hash ON user_locations(location_hash);
 
--- Drop the old geohash column if desired (or keep for temporary backward compat)
+-- Drop the old geohash column constraint or column itself
+ALTER TABLE user_locations ALTER COLUMN geohash DROP NOT NULL;
 -- ALTER TABLE user_locations DROP COLUMN IF EXISTS geohash;
 
 -- 3. Modify contacts table structure if needed (JSONB structure)

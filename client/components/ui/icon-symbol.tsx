@@ -29,6 +29,9 @@ const MAPPING = {
   'checkmark': 'check',
   'xmark': 'close',
   'chevron.right': 'chevron-right',
+  'location.circle': 'my-location',
+  'heart.fill': 'favorite',
+  'heart': 'favorite-border',
 } as IconMapping;
 
 /**

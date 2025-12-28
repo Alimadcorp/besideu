@@ -123,6 +123,7 @@ export default function FriendsScreen() {
                     keyExtractor={item => item.id}
                     renderItem={renderItem}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.icon, marginLeft: 80 }} />}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <ThemedText>No friends found.</ThemedText>
@@ -199,6 +200,16 @@ const styles = StyleSheet.create({
         padding: 30,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    badge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+    },
+    badgeText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: 'bold',
     }
 
 });

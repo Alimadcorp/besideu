@@ -3,14 +3,10 @@ import { supabaseAdmin } from '../../../../../../lib/supabaseClient';
 import { getCurrentUserFromRequest } from '../../../../../../lib/authUser';
 
 export async function POST(req, { params }) {
+  const { id: dmId } = await params;
   const { user, error: authError } = await getCurrentUserFromRequest(req);
   if (!user) {
     return NextResponse.json({ error: authError || 'Unauthorized', code: 'unauthorized' }, { status: 401 });
-  }
-
-  const dmId = params?.id;
-  if (!dmId) {
-    return NextResponse.json({ error: 'dm id required', code: 'bad_request' }, { status: 400 });
   }
 
   try {
@@ -77,7 +73,7 @@ export async function POST(req, { params }) {
           created_at: createdAt,
           location: null
         });
-      
+
       if (meetupErr) {
         console.error('[messages/send] meetup create', meetupErr);
         return NextResponse.json({ error: 'Failed to create meetup request', code: 'supabase_error' }, { status: 500 });
@@ -106,7 +102,7 @@ export async function POST(req, { params }) {
       last_message: text,
       last_message_at: createdAt,
     };
-    
+
     // Increment unread count for the OTHER user
     if (isUser1) {
       updates.unread_count_2 = (friendRow.unread_count_2 || 0) + 1;

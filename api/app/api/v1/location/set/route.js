@@ -34,6 +34,7 @@ export async function PUT(req) {
         {
           user_id: user.id,
           location_hash,
+          geohash: '', // Legacy backfill to satisfy NOT NULL constraint if migration hasn't run
           updated_at: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
         },
         { onConflict: 'user_id' },

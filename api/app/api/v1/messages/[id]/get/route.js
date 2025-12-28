@@ -3,14 +3,10 @@ import { supabaseAdmin } from '../../../../../../lib/supabaseClient';
 import { getCurrentUserFromRequest } from '../../../../../../lib/authUser';
 
 export async function GET(req, { params }) {
+  const { id: dmId } = await params;
   const { user, error: authError } = await getCurrentUserFromRequest(req);
   if (!user) {
     return NextResponse.json({ error: authError || 'Unauthorized', code: 'unauthorized' }, { status: 401 });
-  }
-
-  const dmId = params?.id;
-  if (!dmId) {
-    return NextResponse.json({ error: 'dm id required', code: 'bad_request' }, { status: 400 });
   }
 
   const { searchParams } = new URL(req.url);
@@ -54,37 +50,37 @@ export async function GET(req, { params }) {
 
     let meetupsMap = {};
     if (meetupRequestIds.length > 0) {
-       const { data: meetupsData, error: meetupErr } = await supabaseAdmin
-         .from('meetups')
-         .select('*')
-         .in('id', meetupRequestIds);
-       
-       if (meetupErr) {
-         console.error('[messages/get] fetch meetups', meetupErr);
-       } else if (meetupsData) {
-         const now = new Date();
-         meetupsData.forEach(m => {
-            // Lazy expiration check
-            let status = m.status;
-            if (status === 'pending' && m.expires_at && new Date(m.expires_at) < now) {
-               status = 'expired';
-               // Optimistically update DB? maybe separately. For now just return expired.
-            }
-            meetupsMap[m.id] = { ...m, status };
-         });
-       }
+      const { data: meetupsData, error: meetupErr } = await supabaseAdmin
+        .from('meetups')
+        .select('*')
+        .in('id', meetupRequestIds);
+
+      if (meetupErr) {
+        console.error('[messages/get] fetch meetups', meetupErr);
+      } else if (meetupsData) {
+        const now = new Date();
+        meetupsData.forEach(m => {
+          // Lazy expiration check
+          let status = m.status;
+          if (status === 'pending' && m.expires_at && new Date(m.expires_at) < now) {
+            status = 'expired';
+            // Optimistically update DB? maybe separately. For now just return expired.
+          }
+          meetupsMap[m.id] = { ...m, status };
+        });
+      }
     }
 
     // Map messages to include meetup details
     const mappedMessages = messages.map(m => {
-       let meetupRequest = null;
-       if (m.meetup_request_id && meetupsMap[m.meetup_request_id]) {
-          meetupRequest = meetupsMap[m.meetup_request_id];
-       }
-       return {
-          ...m,
-          meetup_request: meetupRequest
-       };
+      let meetupRequest = null;
+      if (m.meetup_request_id && meetupsMap[m.meetup_request_id]) {
+        meetupRequest = meetupsMap[m.meetup_request_id];
+      }
+      return {
+        ...m,
+        meetup_request: meetupRequest
+      };
     });
 
     return NextResponse.json({

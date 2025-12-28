@@ -3,14 +3,10 @@ import { supabaseAdmin } from '../../../../../../lib/supabaseClient';
 import { getCurrentUserFromRequest } from '../../../../../../lib/authUser';
 
 export async function POST(req, { params }) {
+    const { id: dmId } = await params;
     const { user, error: authError } = await getCurrentUserFromRequest(req);
     if (!user) {
         return NextResponse.json({ error: authError || 'Unauthorized', code: 'unauthorized' }, { status: 401 });
-    }
-
-    const dmId = params?.id;
-    if (!dmId) {
-        return NextResponse.json({ error: 'dm id required', code: 'bad_request' }, { status: 400 });
     }
 
     try {
