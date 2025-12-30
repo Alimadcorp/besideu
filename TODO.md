@@ -256,7 +256,9 @@ This document lists all tasks needed to complete the BesideU application, organi
 - [x] Implement message reactions UI (optional, if time permits)
 - [x] Handle message sending errors and retries
 - [x] Test chat functionality with multiple messages
-- [x] Test WebSocket integration for real-time updates
+- [x] Integrate WebSocket integration for real-time updates
+- [x] Implement chat image upload and display
+- [x] Add profile picture support in chat header and bubbles
 
 ---
 

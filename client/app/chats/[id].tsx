@@ -4,6 +4,8 @@ import { StyleSheet, View, TextInput, FlatList, KeyboardAvoidingView, Platform, 
 import { formatDistanceToNow } from 'date-fns';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -18,10 +20,11 @@ type Message = {
     text: string;
     sender_id: string;
     timestamp: string;
+    image_url?: string;
     reactions?: Record<string, string>; // userId -> reaction char
     meetup_request?: {
         id: string;
-        status: 'pending' | 'accepted' | 'declined';
+        status: 'pending' | 'accepted' | 'declined' | 'expired';
         location: any;
     };
 };
@@ -38,6 +41,8 @@ type ChatData = {
     user: {
         id: string;
         username: string;
+        real_name?: string;
+        avatar_url?: string;
     };
     messages: Message[];
     reactions: Reaction[];
@@ -46,7 +51,7 @@ type ChatData = {
 export default function ChatScreen() {
     const { id } = useLocalSearchParams();
     const [messages, setMessages] = useState<Message[]>([]);
-    const [chatUser, setChatUser] = useState<{ id: string, username: string } | null>(null);
+    const [chatUser, setChatUser] = useState<ChatData['user'] | null>(null);
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
@@ -55,8 +60,6 @@ export default function ChatScreen() {
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
     const { user } = useAuth();
-
-
 
     const lastMessageTimestamp = useRef<string | undefined>(undefined);
 
@@ -103,7 +106,6 @@ export default function ChatScreen() {
         const removeListener = addSocketListener((msg) => {
             if (msg.type === 'new_message' && msg.payload.dm_id === id) {
                 console.log('New message received via socket', msg);
-                // Fetch new messages since last known timestamp
                 fetchMessages(lastMessageTimestamp.current).then(() => markAsRead());
             }
         });
@@ -113,11 +115,11 @@ export default function ChatScreen() {
         };
     }, [fetchMessages, id, markAsRead]);
 
-    const sendMessage = async () => {
-        if (!inputText.trim()) return;
+    const sendMessage = async (textOverride?: string, imageUrl?: string) => {
+        const textToSend = textOverride !== undefined ? textOverride : inputText;
+        if (!textToSend.trim() && !imageUrl) return;
 
-        const textToSend = inputText;
-        setInputText(''); // Optimistic clear
+        if (textOverride === undefined) setInputText('');
         setSending(true);
 
         try {
@@ -125,14 +127,15 @@ export default function ChatScreen() {
                 method: 'POST',
                 body: JSON.stringify({
                     text: textToSend,
+                    image_url: imageUrl,
                     timestamp: new Date().toISOString(),
                 }),
             });
 
-            // Optimistically add message
             const newMessage: Message = {
                 id: response.message_id,
                 text: textToSend,
+                image_url: imageUrl,
                 sender_id: user!.id,
                 timestamp: response.timestamp,
             };
@@ -140,18 +143,58 @@ export default function ChatScreen() {
             setMessages(prev => [newMessage, ...prev]);
         } catch (error) {
             console.error('Failed to send message:', error);
-            // Ideally show error toast and restore text
-            setInputText(textToSend);
+            if (textOverride === undefined) setInputText(textToSend);
+            Alert.alert('Error', 'Failed to send message');
         } finally {
             setSending(false);
         }
+    };
 
+    const pickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.7,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                uploadAndSendImage(result.assets[0].uri);
+            }
+        } catch (e) {
+            Alert.alert('Error', 'Failed to pick image');
+        }
+    };
+
+    const uploadAndSendImage = async (uri: string) => {
+        setSending(true);
+        try {
+            const formData = new FormData();
+            formData.append('image', {
+                uri,
+                type: 'image/jpeg',
+                name: 'chat_image.jpg',
+            } as any);
+
+            const uploadData = await apiRequest('/v1/image/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (uploadData.url) {
+                await sendMessage('', uploadData.url);
+            }
+        } catch (error) {
+            console.error('Image upload failed', error);
+            Alert.alert('Error', 'Failed to upload image');
+        } finally {
+            setSending(false);
+        }
     };
 
     const requestMeetup = async () => {
         Alert.alert(
             'Request Meetup',
-            'Do you want to send a meetup request to this user? They will be able to see your exact location if they accept.',
+            'Do you want to send a meetup request to this user?',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -166,14 +209,13 @@ export default function ChatScreen() {
                                     timestamp: new Date().toISOString(),
                                 }),
                             });
-                            // Optimistically add
                             const newMessage: Message = {
                                 id: response.message_id,
                                 text: '📍 I sent a meetup request!',
                                 sender_id: user!.id,
                                 timestamp: response.timestamp,
                                 meetup_request: {
-                                    id: 'temp', // This will be updated on refresh
+                                    id: 'temp',
                                     status: 'pending',
                                     location: null
                                 }
@@ -192,7 +234,7 @@ export default function ChatScreen() {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission denied', 'Location permission is required to accept a meetup.');
+                Alert.alert('Permission denied', 'Location permission is required.');
                 return;
             }
 
@@ -212,8 +254,8 @@ export default function ChatScreen() {
                 })
             });
 
-            Alert.alert('Success', 'Meetup accepted! Location sent.');
-            fetchMessages(); // Refresh to show updated status
+            Alert.alert('Success', 'Meetup accepted!');
+            fetchMessages();
         } catch (error: any) {
             Alert.alert('Error', error.message || 'Failed to accept meetup');
         } finally {
@@ -222,17 +264,11 @@ export default function ChatScreen() {
     };
 
     const handleDoubleTap = async (messageId: string) => {
-        // Simple "Heart" reaction
         try {
-            const reaction = '❤️';
-            // Optimistic update (complex with Map, so maybe just API call and fetch)
-            // Or simple local toggle
-            // For now, fire and forget API
             await apiRequest(`/v1/messages/${id}/react`, {
                 method: 'POST',
-                body: JSON.stringify({ message_id: messageId, reaction })
+                body: JSON.stringify({ message_id: messageId, reaction: '❤️' })
             });
-            // Re-fetch to see it
             fetchMessages();
         } catch (e) {
             console.log('Reaction failed', e);
@@ -245,8 +281,7 @@ export default function ChatScreen() {
 
         const handlePress = () => {
             const now = Date.now();
-            const DOUBLE_PRESS_DELAY = 500;
-            if (now - lastTap < DOUBLE_PRESS_DELAY) {
+            if (now - lastTap < 500) {
                 handleDoubleTap(item.id);
             }
             lastTap = now;
@@ -265,9 +300,18 @@ export default function ChatScreen() {
                     isMe ? { backgroundColor: theme.tint } : { backgroundColor: theme.icon },
                     item.meetup_request ? styles.meetupBubble : {}
                 ]}>
-                    <ThemedText style={[styles.messageText, isMe ? { color: 'white' } : { color: theme.background }]}>
-                        {item.text}
-                    </ThemedText>
+                    {item.image_url && (
+                        <Image
+                            source={{ uri: item.image_url }}
+                            style={styles.messageImage}
+                            contentFit="cover"
+                        />
+                    )}
+                    {item.text ? (
+                        <ThemedText style={[styles.messageText, isMe ? { color: 'white' } : { color: theme.background }]}>
+                            {item.text}
+                        </ThemedText>
+                    ) : null}
                 </View>
 
                 {item.reactions && Object.keys(item.reactions).length > 0 && (
@@ -324,7 +368,21 @@ export default function ChatScreen() {
         >
             <Stack.Screen
                 options={{
-                    title: chatUser?.username || 'Chat',
+                    headerTitle: () => (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <View style={[styles.headerAvatar, { backgroundColor: theme.tint }]}>
+                                {chatUser?.avatar_url ? (
+                                    <Image source={{ uri: chatUser.avatar_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                                ) : (
+                                    <ThemedText style={styles.headerAvatarText}>{chatUser?.username.charAt(0).toUpperCase()}</ThemedText>
+                                )}
+                            </View>
+                            <View>
+                                <ThemedText type="defaultSemiBold">{chatUser?.real_name || chatUser?.username}</ThemedText>
+                                <ThemedText style={{ fontSize: 10, opacity: 0.6 }}>@{chatUser?.username}</ThemedText>
+                            </View>
+                        </View>
+                    ),
                     headerRight: () => (
                         <TouchableOpacity onPress={requestMeetup} style={{ marginRight: 10 }}>
                             <IconSymbol name="location.circle" size={24} color={theme.tint} />
@@ -343,6 +401,9 @@ export default function ChatScreen() {
             />
 
             <View style={[styles.inputContainer, { borderTopColor: theme.icon }]}>
+                <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
+                    <IconSymbol size={24} name="camera.fill" color={theme.icon} />
+                </TouchableOpacity>
                 <TextInput
                     style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
                     placeholder="Type a message..."
@@ -352,9 +413,9 @@ export default function ChatScreen() {
                     multiline
                 />
                 <TouchableOpacity
-                    onPress={sendMessage}
-                    disabled={sending || !inputText.trim()}
-                    style={[styles.sendButton, { opacity: !inputText.trim() ? 0.5 : 1 }]}
+                    onPress={() => sendMessage()}
+                    disabled={sending || (!inputText.trim())}
+                    style={[styles.sendButton, { opacity: sending || !inputText.trim() ? 0.5 : 1 }]}
                 >
                     <IconSymbol size={28} name="arrow.up.circle.fill" color={theme.tint} />
                 </TouchableOpacity>
@@ -391,6 +452,13 @@ const styles = StyleSheet.create({
         padding: 12,
         borderRadius: 20,
         marginBottom: 5,
+        overflow: 'hidden',
+    },
+    messageImage: {
+        width: 200,
+        height: 200,
+        borderRadius: 15,
+        marginBottom: 5,
     },
     messageText: {
         fontSize: 16,
@@ -403,7 +471,7 @@ const styles = StyleSheet.create({
     meetupContainer: {
         marginTop: 5,
         padding: 10,
-        backgroundColor: '#eee',
+        backgroundColor: 'rgba(238, 238, 238, 0.8)',
         borderRadius: 10
     },
     inputContainer: {
@@ -412,6 +480,10 @@ const styles = StyleSheet.create({
         borderTopWidth: StyleSheet.hairlineWidth,
         alignItems: 'center',
         backgroundColor: 'transparent',
+    },
+    attachButton: {
+        marginRight: 10,
+        padding: 5,
     },
     input: {
         flex: 1,
@@ -453,5 +525,18 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 2
+    },
+    headerAvatar: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    headerAvatarText: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: 'bold',
     }
 });

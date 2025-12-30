@@ -149,13 +149,17 @@ export default function ProfileScreen() {
         if (resendCooldown > 0) return;
 
         try {
-            const user = auth.currentUser;
-            if (user) {
-                await user.sendEmailVerification();
+            const fbUser = auth.currentUser;
+            if (fbUser) {
+                await fbUser.sendEmailVerification();
                 setResendCooldown(60);
                 Alert.alert('Sent', 'Verification email has been sent to your address.');
             } else {
-                Alert.alert('Error', 'No authenticated user found');
+                Alert.alert(
+                    'Session Missing',
+                    'For security, you must have a fresh login session to resend verification emails. Please log out and log back in to verify your email.',
+                    [{ text: 'OK' }]
+                );
             }
         } catch (e: any) {
             console.error('Resend verification error', e);
