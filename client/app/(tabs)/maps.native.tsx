@@ -22,6 +22,7 @@ type NearbyUser = {
   id: string;
   username: string;
   real_name?: string;
+  avatar_url?: string;
   distance: string; // 'near' | 'far'
   location_hash: string;
 };
@@ -121,8 +122,16 @@ export default function NearbyScreen() {
   const renderItem = ({ item }: { item: NearbyUser }) => (
     <View style={[styles.userItem, { borderBottomColor: theme.icon }]}>
       <View style={styles.avatarContainer}>
-        <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
-          <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+        <View style={[styles.avatar, { backgroundColor: theme.tint, overflow: 'hidden' }]}>
+          {item.avatar_url ? (
+            <Image
+              source={{ uri: item.avatar_url }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+            />
+          ) : (
+            <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+          )}
         </View>
       </View>
       <View style={styles.userInfo}>

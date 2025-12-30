@@ -96,6 +96,19 @@ export async function POST(req) {
     // Hash phone for discovery privacy
     const phoneHash = hashPhone(phone);
 
+    // Sync email to Firebase if provided
+    if (email) {
+      try {
+        await admin.auth().updateUser(firebaseUid, {
+          email: email,
+          emailVerified: false,
+        });
+      } catch (fbErr) {
+        console.error('[auth/signup] Firebase email sync failed', fbErr);
+        // We continue even if Firebase sync fails, as the Supabase record is primary for our app
+      }
+    }
+
     const { data: newUser, error: insertErr } = await supabaseAdmin
       .from('users')
       .insert({

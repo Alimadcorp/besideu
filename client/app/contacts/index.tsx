@@ -10,12 +10,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiRequest } from '@/utils/api';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { hashPhone } from '@/utils/crypto';
+import { Image } from 'expo-image';
 
 type ContactUser = {
     user_id: string;
     username: string;
     phone: string;
     contact_name: string;
+    avatar_url?: string;
     is_friend: boolean;
 };
 
@@ -62,6 +64,7 @@ export default function ContactsScreen() {
             const merged = matches.map((m: any) => ({
                 user_id: m.user_id,
                 username: m.username,
+                avatar_url: m.avatar_url,
                 // Resolve name locally using the returned hash
                 contact_name: hashToName.get(m.hash) || m.username,
                 is_friend: m.is_friend,
@@ -132,8 +135,16 @@ export default function ContactsScreen() {
     const renderItem = ({ item }: { item: ContactUser }) => (
         <View style={[styles.item, { borderBottomColor: theme.icon }]}>
             <View style={styles.avatarContainer}>
-                <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
-                    <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+                <View style={[styles.avatar, { backgroundColor: theme.tint, overflow: 'hidden' }]}>
+                    {item.avatar_url ? (
+                        <Image
+                            source={{ uri: item.avatar_url }}
+                            style={{ width: '100%', height: '100%' }}
+                            contentFit="cover"
+                        />
+                    ) : (
+                        <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+                    )}
                 </View>
             </View>
             <View style={styles.userInfo}>

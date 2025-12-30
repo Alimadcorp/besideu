@@ -83,9 +83,18 @@ export async function GET(req, { params }) {
       };
     });
 
+    // Fetch friend info
+    const { data: friendRow } = await supabaseAdmin
+      .from('friends')
+      .select('user_id_1, user_id_2, u1:user_id_1(id, username, real_name, avatar_url), u2:user_id_2(id, username, real_name, avatar_url)')
+      .eq('id', dmId)
+      .single();
+
+    const friendInfo = friendRow ? (friendRow.user_id_1 === user.id ? friendRow.u2 : friendRow.u1) : null;
+
     return NextResponse.json({
       dm_id: dmId,
-      user: null, // client should know who they are talking to via DM list logic or context
+      user: friendInfo,
       messages: mappedMessages,
       reactions,
     });

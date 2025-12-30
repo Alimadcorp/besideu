@@ -53,7 +53,7 @@ export async function GET(req) {
 
     const { data: candidates, error: candidatesErr } = await supabaseAdmin
       .from('user_locations')
-      .select('user_id, location_hash, users!inner ( username, real_name, preferences )')
+      .select('user_id, location_hash, users!inner ( username, real_name, preferences, avatar_url )')
       .neq('user_id', user.id)
       .eq('location_hash', myLocationHash);
 
@@ -75,6 +75,7 @@ export async function GET(req) {
         id: row.user_id,
         username: row.users?.username || null,
         real_name: row.users?.real_name || null,
+        avatar_url: row.users?.avatar_url || null,
         distance: 'near', // Fuzzy distance as per new privacy spec
         // location_hash: row.location_hash, // REMOVED: Do not expose hash to client for non-friends to ensure fuzzy-only perception
       });

@@ -49,7 +49,7 @@ export async function GET(req) {
       if (userFilter) {
         const { data } = await supabaseAdmin
           .from('users')
-          .select('id, username, phone_hash')
+          .select('id, username, phone_hash, avatar_url')
           .eq('id', userFilter);
         if (data) data.forEach(u => userMap.set(u.id, u));
       }
@@ -90,6 +90,7 @@ export async function GET(req) {
       matched = (users || []).map((u) => ({
         user_id: u.id,
         username: u.username,
+        avatar_url: u.avatar_url,
         hash: u.phone_hash, // Client uses this to map to real name
         is_friend: friendIds.has(u.id),
       }));

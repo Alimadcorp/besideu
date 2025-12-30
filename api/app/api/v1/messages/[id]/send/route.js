@@ -46,10 +46,14 @@ export async function POST(req, { params }) {
 
     // 3. Parse Body
     const body = await req.json();
-    const { text, timestamp, meetup, meta } = body || {};
+    const { text, timestamp, meetup, image_url } = body || {};
 
-    if (!text || typeof text !== 'string' || text.length > 2000) {
-      return NextResponse.json({ error: 'text is required (<=2000 chars)', code: 'invalid_text' }, { status: 400 });
+    if (!text && !image_url && !meetup) {
+      return NextResponse.json({ error: 'Message content is required (text or image)', code: 'bad_request' }, { status: 400 });
+    }
+
+    if (text && text.length > 2000) {
+      return NextResponse.json({ error: 'text is too long (<=2000 chars)', code: 'invalid_text' }, { status: 400 });
     }
 
     const createdAt = timestamp ? new Date(timestamp).toISOString() : new Date().toISOString();
@@ -87,7 +91,8 @@ export async function POST(req, { params }) {
         id: messageId,
         dm_id: dmId,
         sender_id: user.id,
-        text,
+        text: text || (image_url ? '📷 Image' : ''),
+        image_url: image_url || null,
         timestamp: createdAt,
         meetup_request_id: meetupRequestId,
       });
@@ -99,7 +104,7 @@ export async function POST(req, { params }) {
 
     // 6. Update Friends (Inbox & Unread)
     const updates = {
-      last_message: text,
+      last_message: text || (image_url ? '📷 Image' : '📍 Meetup Request'),
       last_message_at: createdAt,
     };
 
@@ -126,5 +131,3 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: 'Unexpected error', code: 'internal_error' }, { status: 500 });
   }
 }
-
-

@@ -5,6 +5,7 @@ import { useRouter, Link } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
+import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiRequest } from '@/utils/api';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -37,6 +38,7 @@ type Friend = {
     friend_id: string;
     username: string;
     real_name?: string;
+    avatar_url?: string;
     last_message?: string;
     unread_count: number;
 };
@@ -79,8 +81,16 @@ export default function FriendsScreen() {
             }}
         >
             <View style={styles.avatarContainer}>
-                <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
-                    <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+                <View style={[styles.avatar, { backgroundColor: theme.tint, overflow: 'hidden' }]}>
+                    {item.avatar_url ? (
+                        <Image
+                            source={{ uri: item.avatar_url }}
+                            style={{ width: '100%', height: '100%' }}
+                            contentFit="cover"
+                        />
+                    ) : (
+                        <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+                    )}
                 </View>
             </View>
             <View style={styles.userInfo}>
