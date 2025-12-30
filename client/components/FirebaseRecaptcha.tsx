@@ -1,7 +1,8 @@
 import React, { forwardRef, useImperativeHandle, useState } from 'react';
-import { Modal, StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Modal, StyleSheet, View, TouchableOpacity, ActivityIndicator, useColorScheme, SafeAreaView } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { ThemedText } from './themed-text';
+import { Colors } from '@/constants/theme';
 
 export interface FirebaseRecaptchaVerifier {
     readonly _reset: () => void;
@@ -20,6 +21,8 @@ const FirebaseRecaptchaVerifierModal = forwardRef((props: Props, ref) => {
     const [visible, setVisible] = useState(false);
     const [resolve, setResolve] = useState<((token: string) => void) | null>(null);
     const [reject, setReject] = useState<((error: Error) => void) | null>(null);
+    const colorScheme = useColorScheme() || 'light';
+    const theme = Colors[colorScheme];
 
     useImperativeHandle(ref, () => ({
         type: 'recaptcha',
@@ -42,8 +45,18 @@ const FirebaseRecaptchaVerifierModal = forwardRef((props: Props, ref) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
         <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+        <style>
+            body { 
+                margin: 0; 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                height: 100vh; 
+                background-color: ${theme.background}; 
+            }
+        </style>
     </head>
-    <body style="margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: transparent;">
+    <body>
         <div id="recaptcha-container"></div>
         <script>
             try {
@@ -51,7 +64,8 @@ const FirebaseRecaptchaVerifierModal = forwardRef((props: Props, ref) => {
                 firebase.initializeApp(firebaseConfig);
                 
                 const verifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                    size: 'normal', // Use normal so it's visible in the modal
+                    size: 'normal',
+                    theme: '${colorScheme}',
                     callback: (response) => {
                         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'success', token: response }));
                     },
@@ -94,54 +108,47 @@ const FirebaseRecaptchaVerifierModal = forwardRef((props: Props, ref) => {
     if (!visible) return null;
 
     return (
-        <Modal visible={visible} transparent animationType="slide">
-            <View style={styles.overlay}>
-                <View style={styles.container}>
-                    <View style={styles.header}>
-                        <ThemedText type="defaultSemiBold">{title}</ThemedText>
-                        <TouchableOpacity onPress={handleCancel}>
-                            <ThemedText style={styles.cancel}>{cancelLabel}</ThemedText>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.webviewContainer}>
-                        <WebView
-                            source={{ html }}
-                            onMessage={onMessage}
-                            style={{ backgroundColor: 'transparent' }}
-                            javaScriptEnabled
-                            originWhitelist={['*']}
-                        />
-                    </View>
+        <Modal visible={visible} transparent={false} animationType="slide">
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+                <View style={[styles.header, { borderBottomColor: theme.icon + '33' }]}>
+                    <ThemedText type="defaultSemiBold" style={{ color: theme.text }}>{title}</ThemedText>
+                    <TouchableOpacity onPress={handleCancel}>
+                        <ThemedText style={styles.cancel}>{cancelLabel}</ThemedText>
+                    </TouchableOpacity>
                 </View>
-            </View>
+                <View style={styles.webviewContainer}>
+                    <WebView
+                        source={{
+                            html,
+                            baseUrl: `https://${firebaseConfig.authDomain}`
+                        }}
+                        onMessage={onMessage}
+                        style={{ backgroundColor: theme.background }}
+                        javaScriptEnabled
+                        domStorageEnabled={true}
+                        originWhitelist={['*']}
+                    />
+                </View>
+            </SafeAreaView>
         </Modal>
     );
 });
 
 const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        padding: 20,
-    },
     container: {
-        backgroundColor: 'white',
-        borderRadius: 20,
-        height: 400,
-        overflow: 'hidden',
+        flex: 1,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         padding: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
         alignItems: 'center',
     },
     cancel: {
         color: '#ff4444',
         fontWeight: 'bold',
+        fontSize: 16,
     },
     webviewContainer: {
         flex: 1,
