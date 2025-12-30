@@ -75,6 +75,13 @@ export async function POST(req) {
             .update({ status: 'accepted' })
             .eq('id', existingReq.id);
 
+          const { sendPushNotification } = await import('../../../../../lib/pushNotifications');
+          sendPushNotification(targetUserId, {
+            title: 'New Friend',
+            body: `${user.username} accepted your friend request!`,
+            data: { type: 'friend_accepted', userId: user.id }
+          });
+
           return NextResponse.json({ success: true, friendship_id: friendRow.id, message: 'Mutual request accepted' });
         }
       }
@@ -94,6 +101,13 @@ export async function POST(req) {
       console.error('[friends/add] insert request', error);
       return NextResponse.json({ error: 'Failed to create request', code: 'create_failed' }, { status: 500 });
     }
+
+    const { sendPushNotification } = await import('../../../../../lib/pushNotifications');
+    sendPushNotification(targetUserId, {
+      title: 'Friend Request',
+      body: `${user.username} sent you a friend request!`,
+      data: { type: 'friend_request', userId: user.id }
+    });
 
     return NextResponse.json({ success: true, request_id: data.id });
   } catch (err) {

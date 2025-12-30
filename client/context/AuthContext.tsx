@@ -33,6 +33,15 @@ export function useAuth() {
     return useContext(AuthContext);
 }
 
+import { registerForPushNotificationsAsync, updatePushTokenOnServer } from '@/utils/notifications';
+
+async function registerPush() {
+    const token = await registerForPushNotificationsAsync();
+    if (token) {
+        await updatePushTokenOnServer(token);
+    }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (token && userData) {
                 setUser(userData);
                 connectWebSocket();
+                registerPush(); // Run in background
             } else if (token) {
                 // Token exists but no user data, try to fetch or Logout
                 await removeToken();
@@ -74,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await storeUser(data.user);
             setUser(data.user);
             connectWebSocket();
-            // Navigation handled by RootLayout useEffect when user state changes
+            registerPush(); // Run in background
         } catch (error) {
             console.error('Sign in failed', error);
             throw error;
@@ -98,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await storeUser(data.user);
             setUser(data.user);
             connectWebSocket();
-            // Navigation handled by RootLayout useEffect
+            registerPush(); // Run in background
         } catch (error) {
             console.error('Sign up failed', error);
             throw error;
@@ -107,6 +117,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function signOut() {
         try {
+            // Remove push token on logout for security
+            await apiRequest('/v1/user/settings', {
+                method: 'PUT',
+                body: JSON.stringify({ expo_push_token: null }),
+            });
             await apiRequest('/v1/logout', { method: 'POST' });
         } catch (e) {
             console.log('Logout API failed', e);

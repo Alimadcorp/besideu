@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, Link, useLocalSearchParams } from 'expo-router';
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import FirebaseRecaptchaVerifierModal, { FirebaseRecaptchaVerifier } from '@/components/FirebaseRecaptcha';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { auth, firebase, PhoneAuthProvider } from '@/utils/firebase';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { normalizePhoneNumber } from '@/utils/crypto';
 
 export default function SignupScreen() {
     const { token } = useLocalSearchParams<{ token: string }>();
@@ -20,21 +21,38 @@ export default function SignupScreen() {
     const [verificationCode, setVerificationCode] = useState('');
     const [verificationId, setVerificationId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const { signUp } = useAuth();
     const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
-    const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifierModal>(null);
+    const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifier>(null);
 
     const isProfileCompletion = !!token;
 
+    const getErrorMessage = (err: any) => {
+        const msg = err.message || String(err);
+        if (msg.includes('invalid-phone-number')) return 'The phone number you entered is invalid.';
+        if (msg.includes('too-many-requests')) return 'Too many attempts. Please try again later.';
+        if (msg.includes('invalid-verification-code')) return 'The code you entered is incorrect.';
+        if (msg.includes('code-expired')) return 'The verification code has expired.';
+        if (msg.includes('user-disabled')) return 'This account has been disabled.';
+        if (msg.includes('Network request failed')) return 'Connection error. Check your internet.';
+        if (msg.includes('Username already taken')) return 'This username is already taken. Try another.';
+        return msg;
+    };
+
     const sendVerification = async () => {
-        if (!phone) {
-            Alert.alert('Error', 'Please enter a phone number');
+        setError(null);
+        const normalized = normalizePhoneNumber(phone);
+        if (!normalized || normalized.length < 10) {
+            setError('Please enter a valid phone number');
             return;
         }
+
+        setPhone(normalized);
         setLoading(true);
         try {
             if (recaptchaVerifier.current && !(recaptchaVerifier.current as any)._reset) {
@@ -42,26 +60,26 @@ export default function SignupScreen() {
             }
 
             const phoneProvider = new PhoneAuthProvider();
-            const verificationId = await phoneProvider.verifyPhoneNumber(
-                phone,
+            const verId = await phoneProvider.verifyPhoneNumber(
+                normalized,
                 recaptchaVerifier.current!
             );
-            setVerificationId(verificationId);
-            Alert.alert('Success', 'Verification code has been sent.');
+            setVerificationId(verId);
         } catch (err: any) {
-            Alert.alert('Error', err.message);
+            setError(getErrorMessage(err));
         } finally {
             setLoading(false);
         }
     };
 
     const confirmCodeAndSignup = async () => {
+        setError(null);
         if (!verificationCode || !verificationId) {
-            Alert.alert('Error', 'Please enter the verification code');
+            setError('Please enter the verification code');
             return;
         }
         if (!username || !realName) {
-            Alert.alert('Error', 'Please fill in required fields');
+            setError('Please fill in required fields');
             return;
         }
 
@@ -76,22 +94,23 @@ export default function SignupScreen() {
 
             await signUp(idToken, username, realName, email);
         } catch (err: any) {
-            Alert.alert('Error', `Signup failed: ${err.message}`);
+            setError(getErrorMessage(err));
         } finally {
             setLoading(false);
         }
     };
 
     const completeProfile = async () => {
+        setError(null);
         if (!username || !realName) {
-            Alert.alert('Error', 'Please fill in required fields');
+            setError('Please fill in required fields');
             return;
         }
         setLoading(true);
         try {
-            await signUp(token, username, realName, email);
+            await signUp(token!, username, realName, email);
         } catch (err: any) {
-            Alert.alert('Error', `Profile creation failed: ${err.message}`);
+            setError(getErrorMessage(err));
         } finally {
             setLoading(false);
         }
@@ -118,6 +137,12 @@ export default function SignupScreen() {
                         {isProfileCompletion ? 'Just a few more details' : 'Join BesideU today'}
                     </ThemedText>
 
+                    {error && (
+                        <View style={styles.errorContainer}>
+                            <ThemedText style={styles.errorText}>{error}</ThemedText>
+                        </View>
+                    )}
+
                     {/* Common Fields */}
                     {(verificationId || isProfileCompletion) && (
                         <>
@@ -126,7 +151,10 @@ export default function SignupScreen() {
                                 style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
                                 placeholder="John Doe"
                                 placeholderTextColor="#888"
-                                onChangeText={setRealName}
+                                onChangeText={(text) => {
+                                    setRealName(text);
+                                    if (error) setError(null);
+                                }}
                                 value={realName}
                             />
 
@@ -136,7 +164,10 @@ export default function SignupScreen() {
                                 placeholder="johndoe"
                                 placeholderTextColor="#888"
                                 autoCapitalize="none"
-                                onChangeText={setUsername}
+                                onChangeText={(text) => {
+                                    setUsername(text);
+                                    if (error) setError(null);
+                                }}
                                 value={username}
                             />
 
@@ -147,7 +178,10 @@ export default function SignupScreen() {
                                 placeholderTextColor="#888"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
-                                onChangeText={setEmail}
+                                onChangeText={(text) => {
+                                    setEmail(text);
+                                    if (error) setError(null);
+                                }}
                                 value={email}
                             />
                         </>
@@ -164,7 +198,10 @@ export default function SignupScreen() {
                                 autoComplete="tel"
                                 keyboardType="phone-pad"
                                 textContentType="telephoneNumber"
-                                onChangeText={setPhone}
+                                onChangeText={(text) => {
+                                    setPhone(text);
+                                    if (error) setError(null);
+                                }}
                                 value={phone}
                             />
                             <TouchableOpacity style={styles.primaryButton} onPress={sendVerification}>
@@ -182,7 +219,10 @@ export default function SignupScreen() {
                                 placeholder="123456"
                                 placeholderTextColor="#888"
                                 keyboardType="number-pad"
-                                onChangeText={setVerificationCode}
+                                onChangeText={(text) => {
+                                    setVerificationCode(text);
+                                    if (error) setError(null);
+                                }}
                                 value={verificationCode}
                             />
                             <TouchableOpacity style={styles.primaryButton} onPress={confirmCodeAndSignup}>
@@ -270,5 +310,19 @@ const styles = StyleSheet.create({
         marginTop: 40,
         flexDirection: 'row',
         justifyContent: 'center',
+    },
+    errorContainer: {
+        backgroundColor: '#FFE5E5',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#FF000033',
+    },
+    errorText: {
+        color: '#D00000',
+        fontSize: 14,
+        textAlign: 'center',
+        fontWeight: '500',
     }
 });

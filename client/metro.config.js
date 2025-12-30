@@ -8,8 +8,6 @@ console.warn('--- Metro config is being loaded with Firebase aliases ---');
 
 config.resolver.extraNodeModules = {
     ...config.resolver.extraNodeModules,
-    '@unimodules/core': path.dirname(require.resolve('expo-modules-core/package.json')),
-    '@unimodules/react-native-adapter': path.dirname(require.resolve('expo-modules-core/package.json')),
     'firebase': path.resolve(__dirname, 'utils/firebase-compat.ts'),
 };
 

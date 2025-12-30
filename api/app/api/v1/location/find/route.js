@@ -46,16 +46,35 @@ export async function GET(req) {
 
     const myLocationHash = locationRow.location_hash;
 
-    // Fetch users with the SAME location hash (same region)
-    // We cannot determine distance > 0 because hashing is one-way.
-    // So "range" parameter is effectively ignored or treated as "same region" if small enough.
-    // In future, client could send neighbor hashes to check larger areas.
+    // 1. Fetch current user's accepted friends IDs
+    const { data: friendRows, error: friendErr } = await supabaseAdmin
+      .from('friends')
+      .select('user_id_1, user_id_2')
+      .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`);
 
+    if (friendErr) {
+      console.error('[location/find] Error fetching friends', friendErr);
+      return NextResponse.json({ error: 'Internal error', code: 'supabase_error' }, { status: 500 });
+    }
+
+    const friendIds = (friendRows || []).map(row =>
+      row.user_id_1 === user.id ? row.user_id_2 : row.user_id_1
+    );
+
+    if (friendIds.length === 0) {
+      return NextResponse.json({
+        users: [],
+        pagination: { page: 1, page_size: pageSizeParam || 50, total: 0 }
+      });
+    }
+
+    // 2. Fetch users with the SAME location hash (same region) who ARE friends
     const { data: candidates, error: candidatesErr } = await supabaseAdmin
       .from('user_locations')
       .select('user_id, location_hash, users!inner ( username, real_name, preferences, avatar_url )')
       .neq('user_id', user.id)
-      .eq('location_hash', myLocationHash);
+      .eq('location_hash', myLocationHash)
+      .in('user_id', friendIds);
 
     if (candidatesErr) {
       console.error('[location/find] Error fetching nearby users', candidatesErr);

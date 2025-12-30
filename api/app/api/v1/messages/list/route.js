@@ -39,10 +39,10 @@ export async function GET(req) {
     }
 
     if (!friendRows || friendRows.length === 0) {
-       return NextResponse.json({
-          dms: [],
-          pagination: { limit, offset, returned: 0 }
-       });
+      return NextResponse.json({
+        dms: [],
+        pagination: { limit, offset, returned: 0 }
+      });
     }
 
     // Resolve other users
@@ -54,9 +54,9 @@ export async function GET(req) {
 
     const { data: usersData, error: usersError } = await supabaseAdmin
       .from('users')
-      .select('id, username')
+      .select('id, username, real_name, avatar_url')
       .in('id', Array.from(otherUserIds));
-    
+
     const userMap = {};
     if (usersData) {
       usersData.forEach(u => userMap[u.id] = u);
@@ -73,6 +73,8 @@ export async function GET(req) {
         id: row.id,
         user_id: otherUser.id,
         username: otherUser.username,
+        real_name: otherUser.real_name,
+        avatar_url: otherUser.avatar_url,
         last_message: {
           text: row.last_message || '',
           timestamp: row.last_message_at || row.created_at, // fallback

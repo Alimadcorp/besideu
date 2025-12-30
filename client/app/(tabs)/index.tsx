@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
 
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -15,6 +16,8 @@ type DM = {
   id: string;
   user_id: string;
   username: string;
+  real_name?: string;
+  avatar_url?: string;
   last_message: {
     text: string;
     timestamp: string;
@@ -79,17 +82,26 @@ export default function ChatsScreen() {
 
   const renderItem = ({ item }: { item: DM }) => (
     <TouchableOpacity
-      style={[styles.chatItem, { borderBottomColor: theme.icon }]}
+      style={[styles.chatItem, { borderBottomColor: theme.icon + '20' }]}
       onPress={() => router.push(`/chats/${item.id}` as any)}
     >
       <View style={styles.avatarContainer}>
-        <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
-          <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+        <View style={[styles.avatar, { backgroundColor: theme.tint, overflow: 'hidden' }]}>
+          {item.avatar_url ? (
+            <Image source={{ uri: item.avatar_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+          ) : (
+            <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+          )}
         </View>
+        {item.unread_count > 0 && (
+          <View style={[styles.unreadBadge, { backgroundColor: '#FF3B30' }]} />
+        )}
       </View>
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <ThemedText type="defaultSemiBold" style={styles.username}>{item.username}</ThemedText>
+          <ThemedText type="defaultSemiBold" style={styles.username}>
+            {item.real_name || item.username}
+          </ThemedText>
           <ThemedText style={styles.timestamp}>
             {item.last_message?.timestamp ? formatDistanceToNow(new Date(item.last_message.timestamp), { addSuffix: true }) : ''}
           </ThemedText>
@@ -99,7 +111,7 @@ export default function ChatsScreen() {
             {item.last_message?.text || 'No messages yet'}
           </ThemedText>
           {item.unread_count > 0 && (
-            <View style={styles.badge}>
+            <View style={[styles.badge, { backgroundColor: theme.tint }]}>
               <ThemedText style={styles.badgeText}>{item.unread_count}</ThemedText>
             </View>
           )}
@@ -126,8 +138,17 @@ export default function ChatsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <ThemedText>No conversations yet.</ThemedText>
-              <ThemedText style={styles.emptySubtext}>Find friends on the map or invite contacts!</ThemedText>
+              <View style={[styles.emptyIcon, { backgroundColor: theme.tint + '15' }]}>
+                <IconSymbol name="bubble.left.and.bubble.right.fill" size={40} color={theme.tint} />
+              </View>
+              <ThemedText style={styles.emptyTitle}>Your inbox is empty</ThemedText>
+              <ThemedText style={styles.emptySubtext}>Find your friends and start a conversation!</ThemedText>
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: theme.tint }]}
+                onPress={() => router.push('/contacts')}
+              >
+                <ThemedText style={styles.primaryButtonText}>Find Friends</ThemedText>
+              </TouchableOpacity>
             </View>
           }
           contentContainerStyle={dms.length === 0 && styles.emptyList}
@@ -153,6 +174,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginRight: 15,
+    position: 'relative',
   },
   avatar: {
     width: 50,
@@ -160,6 +182,16 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: 'white',
   },
   avatarText: {
     color: 'white',
@@ -216,11 +248,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    paddingTop: 80,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   emptySubtext: {
-    opacity: 0.6,
+    opacity: 0.5,
     textAlign: 'center',
-    marginTop: 10,
+    marginBottom: 30,
+    lineHeight: 20,
+  },
+  primaryButton: {
+    paddingHorizontal: 30,
+    paddingVertical: 14,
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   emptyList: {
     flexGrow: 1,

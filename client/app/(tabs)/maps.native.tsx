@@ -145,9 +145,14 @@ export default function NearbyScreen() {
       </View>
       <TouchableOpacity
         style={[styles.actionButton, { backgroundColor: theme.tint }]}
-        onPress={() => sendFriendRequest(item.id)}
+        onPress={() => {
+          // We need to find the DM ID or navigate to a screen that can handle it.
+          // For now, we can redirect to the chat tab or a search.
+          // Since they are friends, a DM likely exists or can be created.
+          router.push('/chats' as any);
+        }}
       >
-        <IconSymbol name="plus" size={20} color="white" />
+        <IconSymbol name="message.fill" size={20} color="white" />
       </TouchableOpacity>
     </View>
   );
@@ -177,8 +182,16 @@ export default function NearbyScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <ThemedText>No users found nearby.</ThemedText>
-              <ThemedText style={styles.emptySubtext}>Try increasing your search range or check back later.</ThemedText>
+              <ThemedText style={{ fontSize: 18, marginBottom: 10 }}>Map is for Friends</ThemedText>
+              <ThemedText style={styles.emptySubtext}>
+                For privacy reasons, only friends are shown on the map.
+              </ThemedText>
+              <TouchableOpacity
+                style={[styles.permissionButton, { backgroundColor: theme.tint, marginTop: 20 }]}
+                onPress={() => router.push('/contacts' as any)}
+              >
+                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Find Friends from Contacts</ThemedText>
+              </TouchableOpacity>
             </View>
           }
           contentContainerStyle={nearbyUsers.length === 0 && styles.emptyList}

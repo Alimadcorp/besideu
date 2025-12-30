@@ -70,13 +70,20 @@ export async function GET(req) {
 
       const users = Array.from(userMap.values()).filter(u => u.id !== user.id);
 
-      // 2. Fetch Friend Status
+      // 2. Fetch Friend Status and Requests
       const { data: friendships, error: friendsErr } = await supabaseAdmin
         .from('friends')
         .select('user_id_1, user_id_2')
         .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`);
-      if (friendsErr) {
-        console.error('[contacts/list] fetch friends', friendsErr);
+
+      const { data: requests, error: requestsErr } = await supabaseAdmin
+        .from('friend_requests')
+        .select('id, from_user_id, to_user_id, status')
+        .or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`)
+        .eq('status', 'pending');
+
+      if (friendsErr || requestsErr) {
+        console.error('[contacts/list] fetch status/requests', friendsErr || requestsErr);
       }
 
       const friendIds = new Set();
@@ -85,15 +92,28 @@ export async function GET(req) {
         friendIds.add(otherId);
       }
 
+      const requestsMap = new Map();
+      for (const r of requests || []) {
+        const otherId = r.from_user_id === user.id ? r.to_user_id : r.from_user_id;
+        requestsMap.set(otherId, {
+          id: r.id,
+          direction: r.from_user_id === user.id ? 'outgoing' : 'incoming'
+        });
+      }
+
       // 3. Construct Response
-      // Important: Return the hash so client can map it to a name.
-      matched = (users || []).map((u) => ({
-        user_id: u.id,
-        username: u.username,
-        avatar_url: u.avatar_url,
-        hash: u.phone_hash, // Client uses this to map to real name
-        is_friend: friendIds.has(u.id),
-      }));
+      matched = (users || []).map((u) => {
+        const request = requestsMap.get(u.id);
+        return {
+          user_id: u.id,
+          username: u.username,
+          avatar_url: u.avatar_url,
+          hash: u.phone_hash,
+          is_friend: friendIds.has(u.id),
+          request_id: request?.id || null,
+          request_direction: request?.direction || null
+        };
+      });
     }
 
 

@@ -56,6 +56,13 @@ export async function POST(req) {
       console.error('[friends/accept] update request', updateErr);
     }
 
+    const { sendPushNotification } = await import('../../../../../lib/pushNotifications');
+    sendPushNotification(reqRow.from_user_id, {
+      title: 'Friend Request Accepted',
+      body: `${user.username} is now your friend!`,
+      data: { type: 'friend_accepted', userId: user.id }
+    });
+
     return NextResponse.json({ success: true, friendship_id: friendRow.id });
   } catch (err) {
     console.error('[friends/accept] unexpected', err);

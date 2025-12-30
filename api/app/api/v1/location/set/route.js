@@ -2,10 +2,6 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../../lib/supabaseClient';
 import { getCurrentUserFromRequest } from '../../../../../lib/authUser';
 
-function isValidGeohash(geohash) {
-  return typeof geohash === 'string' && geohash.length >= 4 && geohash.length <= 12;
-}
-
 export async function PUT(req) {
   try {
     const { user, error: authError } = await getCurrentUserFromRequest(req);
@@ -34,7 +30,6 @@ export async function PUT(req) {
         {
           user_id: user.id,
           location_hash,
-          geohash: '', // Legacy backfill to satisfy NOT NULL constraint if migration hasn't run
           updated_at: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
         },
         { onConflict: 'user_id' },

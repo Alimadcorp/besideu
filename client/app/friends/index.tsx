@@ -1,40 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, Link, Stack } from 'expo-router';
+import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { Image } from 'expo-image';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiRequest } from '@/utils/api';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
-// Using mock data endpoint or reusing contacts/list if no direct friends list endpoint in README?
-// Wait, README says GET /v1/contacts/list or GET /v1/location/find filter=friends?
-// "GET /v1/location/find ... Filter by friend status"
-// Actually there isn't a direct "GET /v1/friends/list" endpoint in the README. 
-// However, `GET /v1/contacts/list` returns match users with `is_friend`. 
-// And `GET /v1/location/find` can find friends (but only nearby?). 
-// I should probably assume `GET /v1/contacts/list` is the closest to "Friends List" or maybe I missed an endpoint.
-// Checking README again.
-// README: "Friends Endpoints: add, requests, accept, remove".
-// No "list friends" endpoint explicitly documented in the list summary.
-// But `contacts/list` shows "is_friend".
-// Let's us `contacts/list` and filter by `is_friend === true`?
-// Or maybe I should implement `GET /v1/friends/list` in backend if I was doing backend.
-// Since I am doing frontend only now (per user request), I will try to use /v1/contacts/list and filter? 
-// Or maybe `GET /v1/friends` exists implicitly.
-// Note: The TODO section 17 says "Fetch and display user's friends".
-// I'll assume there's an endpoint or I should use contacts list.
-// Actually, let's use `/v1/contacts/list` for now, or just assume `/v1/friends/list` was created or update TODO.
-// User said "Finish all tasks in TODO.md". TODO item 97 says "Implement GET /v1/contacts/list".
-// TODO item 292 says "Fetch and display user's friends". 
-// I'll try catching `/v1/friends/list` if it fails fallback to contacts. 
-// Actually I'll just check `GET /v1/contacts/list`
-
 type Friend = {
-    id: string; // dm_id
+    id: string; // friendship_id / dm_id
     friend_id: string;
     username: string;
     real_name?: string;
@@ -73,9 +50,31 @@ export default function FriendsScreen() {
         fetchFriends();
     }, [fetchFriends]);
 
+    const removeFriend = async (friendshipId: string, username: string) => {
+        Alert.alert(
+            'Remove Friend',
+            `Are you sure you want to remove ${username} from your friends?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await apiRequest(`/v1/friends/remove?id=${friendshipId}`, { method: 'DELETE' });
+                            fetchFriends();
+                        } catch (error: any) {
+                            Alert.alert('Error', error.message || 'Failed to remove friend');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const renderItem = ({ item }: { item: Friend }) => (
         <TouchableOpacity
-            style={[styles.item, { borderBottomColor: theme.icon }]}
+            style={styles.item}
             onPress={() => {
                 router.push(`/chats/${item.id}` as any);
             }}
@@ -92,52 +91,70 @@ export default function FriendsScreen() {
                         <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
                     )}
                 </View>
+                {item.unread_count > 0 && (
+                    <View style={[styles.badge, { backgroundColor: '#FF3B30', position: 'absolute', right: -4, top: -4 }]}>
+                        <ThemedText style={styles.badgeText}>{item.unread_count}</ThemedText>
+                    </View>
+                )}
             </View>
             <View style={styles.userInfo}>
                 <ThemedText type="defaultSemiBold" style={styles.username}>
                     {item.real_name || item.username}
                 </ThemedText>
-                {item.real_name && <ThemedText style={styles.phone}>@{item.username}</ThemedText>}
+                <ThemedText style={styles.handle}>@{item.username}</ThemedText>
+                {item.last_message && (
+                    <ThemedText numberOfLines={1} style={styles.lastMsg}>{item.last_message}</ThemedText>
+                )}
             </View>
             <View style={styles.actions}>
-                {item.unread_count > 0 && (
-                    <View style={[styles.badge, { backgroundColor: theme.tint }]}>
-                        <ThemedText style={styles.badgeText}>{item.unread_count}</ThemedText>
-                    </View>
-                )}
+                <TouchableOpacity onPress={() => removeFriend(item.id, item.username)} style={styles.iconBtn}>
+                    <IconSymbol name="person.badge.minus" size={20} color={theme.icon} />
+                </TouchableOpacity>
             </View>
         </TouchableOpacity>
     );
 
     return (
         <ThemedView style={styles.container}>
-            <View style={styles.header}>
-                <Link href="/friends/requests" asChild>
-                    <TouchableOpacity style={[styles.requestsBtn, { borderColor: theme.icon }]}>
-                        <ThemedText>Requests</ThemedText>
-                        <IconSymbol name="chevron.right" size={16} color={theme.text} />
-                    </TouchableOpacity>
-                </Link>
-                <Link href="/contacts" asChild>
-                    <TouchableOpacity style={[styles.fab, { backgroundColor: theme.tint }]}>
-                        <IconSymbol name="plus" size={24} color="white" />
-                    </TouchableOpacity>
-                </Link>
-            </View>
+            <Stack.Screen options={{ headerShown: false }} />
 
             {loading ? (
-                <ActivityIndicator size="large" color={theme.tint} style={{ marginTop: 20 }} />
+                <View style={[styles.center, { paddingTop: 100 }]}>
+                    <ActivityIndicator size="large" color={theme.tint} />
+                </View>
             ) : (
                 <FlatList
                     data={friends}
                     keyExtractor={item => item.id}
                     renderItem={renderItem}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                    ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.icon, marginLeft: 80 }} />}
+                    contentContainerStyle={styles.listContent}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />}
+                    ListHeaderComponent={
+                        <View style={styles.header}>
+                            <View>
+                                <ThemedText type="title">Friends</ThemedText>
+                                <ThemedText style={styles.subtitle}>{friends.length} connections</ThemedText>
+                            </View>
+                            <Link href="/contacts" asChild>
+                                <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.tint }]}>
+                                    <IconSymbol name="plus" size={16} color="white" />
+                                    <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Find Friends</ThemedText>
+                                </TouchableOpacity>
+                            </Link>
+                        </View>
+                    }
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <ThemedText>No friends found.</ThemedText>
-                            <ThemedText style={{ opacity: 0.6 }}>Import contacts to find friends!</ThemedText>
+                            <View style={[styles.emptyIcon, { backgroundColor: theme.tint + '15' }]}>
+                                <IconSymbol name="person.2.fill" size={48} color={theme.tint} />
+                            </View>
+                            <ThemedText style={styles.emptyTitle}>Your circle is quiet</ThemedText>
+                            <ThemedText style={styles.emptySubtext}>Connect with people you know or find someone nearby to start a conversation.</ThemedText>
+                            <Link href="/contacts" asChild>
+                                <TouchableOpacity style={[styles.primaryButton, { backgroundColor: theme.tint }]}>
+                                    <ThemedText style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Sync Contacts</ThemedText>
+                                </TouchableOpacity>
+                            </Link>
                         </View>
                     }
                 />
@@ -150,76 +167,144 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    header: {
-        padding: 15,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-    },
-    requestsBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 10,
-        borderWidth: 1,
-        borderRadius: 20,
-        gap: 5
-    },
-    fab: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+    center: {
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    listContent: {
+        paddingBottom: 40,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 60,
+        paddingBottom: 25,
+    },
+    subtitle: {
+        fontSize: 14,
+        opacity: 0.5,
+        marginTop: 2,
+    },
+    addButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 25,
+        gap: 6,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     item: {
         flexDirection: 'row',
-        padding: 15,
-        borderBottomWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
         alignItems: 'center',
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
     },
     avatarContainer: {
-        marginRight: 15,
+        marginRight: 16,
+        position: 'relative',
     },
     avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'rgba(0,0,0,0.05)',
     },
     avatarText: {
         color: 'white',
-        fontSize: 20,
+        fontSize: 24,
         fontWeight: 'bold',
     },
     userInfo: {
         flex: 1,
     },
     username: {
-        fontSize: 16,
+        fontSize: 17,
+        fontWeight: '700',
     },
-    phone: {
-        fontSize: 12,
-        opacity: 0.6
+    handle: {
+        fontSize: 13,
+        opacity: 0.4,
+        marginTop: 1,
+    },
+    lastMsg: {
+        fontSize: 13,
+        opacity: 0.6,
+        marginTop: 4,
     },
     actions: {
-
+        flexDirection: 'row',
+        gap: 12,
+        alignItems: 'center',
     },
-    emptyContainer: {
-        flex: 1,
-        padding: 30,
+    iconBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.03)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    badge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: 'white',
+        minWidth: 20,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    badge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-    },
     badgeText: {
         color: 'white',
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: 'bold',
+    },
+    emptyContainer: {
+        flex: 1,
+        paddingTop: 80,
+        alignItems: 'center',
+        paddingHorizontal: 40,
+    },
+    emptyIcon: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    emptyTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        marginBottom: 10,
+    },
+    emptySubtext: {
+        textAlign: 'center',
+        opacity: 0.5,
+        marginBottom: 32,
+        lineHeight: 22,
+        fontSize: 15,
+    },
+    primaryButton: {
+        paddingHorizontal: 40,
+        paddingVertical: 16,
+        borderRadius: 30,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 5,
     }
-
 });

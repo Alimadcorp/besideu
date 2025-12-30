@@ -102,6 +102,7 @@ export async function POST(req) {
         await admin.auth().updateUser(firebaseUid, {
           email: email,
           emailVerified: false,
+          displayName: realName,
         });
       } catch (fbErr) {
         console.error('[auth/signup] Firebase email sync failed', fbErr);

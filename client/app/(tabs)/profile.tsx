@@ -1,4 +1,4 @@
-import { StyleSheet, Switch, TouchableOpacity, ScrollView, Alert, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, Switch, TouchableOpacity, ScrollView, Alert, View, ActivityIndicator, Modal, TextInput } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -145,25 +145,32 @@ export default function ProfileScreen() {
         }
     }
 
+    const [isEditNameModalVisible, setIsEditNameModalVisible] = useState(false);
+    const [tempName, setTempName] = useState('');
+
+    const user = profile || authUser;
+    const isEmailVerified = user?.email_verified;
+
+    const handleUpdateName = () => {
+        if (tempName.trim()) {
+            updateProfile({ real_name: tempName.trim() });
+            setIsEditNameModalVisible(false);
+        }
+    };
+
     const handleResendVerification = async () => {
         if (resendCooldown > 0) return;
 
+        setSaving(true);
         try {
-            const fbUser = auth.currentUser;
-            if (fbUser) {
-                await fbUser.sendEmailVerification();
-                setResendCooldown(60);
-                Alert.alert('Sent', 'Verification email has been sent to your address.');
-            } else {
-                Alert.alert(
-                    'Session Missing',
-                    'For security, you must have a fresh login session to resend verification emails. Please log out and log back in to verify your email.',
-                    [{ text: 'OK' }]
-                );
-            }
+            await apiRequest('/v1/user/resend-verification', { method: 'POST' });
+            setResendCooldown(60);
+            Alert.alert('Sent', 'Verification email has been sent to your address.');
         } catch (e: any) {
             console.error('Resend verification error', e);
             Alert.alert('Error', e.message || 'Failed to send verification email');
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -195,9 +202,6 @@ export default function ProfileScreen() {
         );
     }
 
-    const user = profile || authUser;
-    const isEmailVerified = auth.currentUser?.emailVerified;
-
     return (
         <ThemedView style={styles.container}>
             <ScrollView contentContainerStyle={styles.content}>
@@ -224,7 +228,7 @@ export default function ProfileScreen() {
                             )}
                         </View>
                         <View style={styles.editBadge}>
-                            <IconSymbol name="camera.fill" size={14} color="#fff" />
+                            <IconSymbol name="pencil" size={14} color="#fff" />
                         </View>
                     </TouchableOpacity>
                     <ThemedText type="title" style={styles.username}>
@@ -241,20 +245,13 @@ export default function ProfileScreen() {
                     <TouchableOpacity
                         style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
                         onPress={() => {
-                            Alert.prompt(
-                                'Change Name',
-                                'Enter your full name',
-                                (name) => {
-                                    if (name) updateProfile({ real_name: name });
-                                },
-                                'plain-text',
-                                user?.real_name
-                            );
+                            setTempName(user?.real_name || '');
+                            setIsEditNameModalVisible(true);
                         }}
                     >
                         <View>
                             <ThemedText style={styles.rowLabel}>Full Name</ThemedText>
-                            <ThemedText style={styles.rowSubtext}>{user?.real_name}</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>{user?.real_name || 'Set your name'}</ThemedText>
                         </View>
                         <IconSymbol name="pencil" size={16} color={theme.icon} />
                     </TouchableOpacity>
@@ -410,6 +407,42 @@ export default function ProfileScreen() {
                 </View>
 
             </ScrollView>
+
+            {/* Edit Name Modal */}
+            <Modal
+                visible={isEditNameModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setIsEditNameModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <ThemedView style={styles.modalContent}>
+                        <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Edit Full Name</ThemedText>
+                        <TextInput
+                            style={[styles.modalInput, { color: theme.text, borderColor: theme.icon + '40' }]}
+                            value={tempName}
+                            onChangeText={setTempName}
+                            placeholder="Enter your full name"
+                            placeholderTextColor="#888"
+                            autoFocus
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: theme.icon + '20' }]}
+                                onPress={() => setIsEditNameModalVisible(false)}
+                            >
+                                <ThemedText>Cancel</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: theme.tint }]}
+                                onPress={handleUpdateName}
+                            >
+                                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Save</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                    </ThemedView>
+                </View>
+            </Modal>
         </ThemedView>
     );
 }
@@ -456,7 +489,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#fff',
+        borderColor: '#fff5',
     },
     username: {
         fontSize: 24,
@@ -543,5 +576,38 @@ const styles = StyleSheet.create({
     rangeBtnText: {
         fontSize: 20,
         fontWeight: 'bold',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        borderRadius: 20,
+        padding: 20,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    modalInput: {
+        height: 50,
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 15,
+        fontSize: 16,
+        marginBottom: 20,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 10,
+    },
+    modalBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 10,
     }
 });

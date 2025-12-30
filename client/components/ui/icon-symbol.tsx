@@ -32,6 +32,9 @@ const MAPPING = {
   'location.circle': 'my-location',
   'heart.fill': 'favorite',
   'heart': 'favorite-border',
+  'bell.fill': 'notifications',
+  'camera.fill': 'camera',
+  'message.fill': 'message',
 } as IconMapping;
 
 /**

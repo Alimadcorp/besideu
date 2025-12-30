@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, Link } from 'expo-router';
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import FirebaseRecaptchaVerifierModal, { FirebaseRecaptchaVerifier } from '@/components/FirebaseRecaptcha';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -10,24 +10,43 @@ import { auth, firebase, PhoneAuthProvider } from '@/utils/firebase';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+import { normalizePhoneNumber } from '@/utils/crypto';
+
 export default function LoginScreen() {
     const [phone, setPhone] = useState('');
     const [verificationCode, setVerificationCode] = useState('');
     const [verificationId, setVerificationId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const { signIn } = useAuth();
     const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
-    const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifierModal>(null);
+    const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifier>(null);
+
+    const getErrorMessage = (err: any) => {
+        const msg = err.message || String(err);
+        if (msg.includes('invalid-phone-number')) return 'The phone number you entered is invalid.';
+        if (msg.includes('too-many-requests')) return 'Too many attempts. Please try again later.';
+        if (msg.includes('invalid-verification-code')) return 'The code you entered is incorrect.';
+        if (msg.includes('code-expired')) return 'The verification code has expired. Please request a new one.';
+        if (msg.includes('User not found') || msg.includes('404')) return null;
+        if (msg.includes('user-disabled')) return 'This account has been disabled.';
+        if (msg.includes('network-request-failed')) return 'Connection error. Check your internet.';
+        return msg;
+    };
 
     const sendVerification = async () => {
-        if (!phone) {
-            Alert.alert('Error', 'Please enter a valid phone number');
+        setError(null);
+        const normalized = normalizePhoneNumber(phone);
+        if (!normalized || normalized.length < 10) {
+            setError('Please enter a valid phone number');
             return;
         }
+
+        setPhone(normalized);
         setLoading(true);
         try {
             if (recaptchaVerifier.current && !(recaptchaVerifier.current as any)._reset) {
@@ -35,14 +54,13 @@ export default function LoginScreen() {
             }
 
             const phoneProvider = new PhoneAuthProvider();
-            const verificationId = await phoneProvider.verifyPhoneNumber(
-                phone,
+            const verId = await phoneProvider.verifyPhoneNumber(
+                normalized,
                 recaptchaVerifier.current!
             );
-            setVerificationId(verificationId);
-            Alert.alert('Success', 'Verification code has been sent to your phone.');
+            setVerificationId(verId);
         } catch (err: any) {
-            Alert.alert('Error', err.message);
+            setError(getErrorMessage(err));
             console.error(err);
         } finally {
             setLoading(false);
@@ -50,8 +68,9 @@ export default function LoginScreen() {
     };
 
     const confirmCode = async () => {
+        setError(null);
         if (!verificationCode || !verificationId) {
-            Alert.alert('Error', 'Please enter the verification code');
+            setError('Please enter the verification code');
             return;
         }
 
@@ -67,20 +86,18 @@ export default function LoginScreen() {
             await signIn(idToken);
         } catch (err: any) {
             console.log('Login error details:', err);
-            // Check if error indicates user not found (404)
+            const errorMsg = getErrorMessage(err);
+
             if (err.message && (err.message.includes('User not found') || err.message.includes('404'))) {
-                // Redirect to Signup (Complete Profile) passing the token
-                // We need the token again. It was just generated. 
-                // Wait, getting ID token again is cheap.
                 const currentUser = auth.currentUser;
                 if (currentUser) {
                     const token = await currentUser.getIdToken();
-                    console.log('Redirecting to signup with token');
                     router.push({ pathname: '/auth/signup', params: { token } });
                 }
+            } else if (errorMsg) {
+                setError(errorMsg);
             } else {
-                Alert.alert('Error', `Login failed: ${err.message}`);
-                console.error(err);
+                setError('Authentication failed. Please try again.');
             }
         } finally {
             setLoading(false);
@@ -102,17 +119,26 @@ export default function LoginScreen() {
                     <ThemedText type="title" style={styles.title}>Welcome Back</ThemedText>
                     <ThemedText style={styles.subtitle}>Sign in to continue</ThemedText>
 
+                    {error && (
+                        <View style={styles.errorContainer}>
+                            <ThemedText style={styles.errorText}>{error}</ThemedText>
+                        </View>
+                    )}
+
                     {!verificationId ? (
                         <>
                             <ThemedText style={styles.label}>Phone Number</ThemedText>
                             <TextInput
                                 style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                                placeholder="+1234567890"
+                                placeholder="+923001234567"
                                 placeholderTextColor="#888"
                                 autoComplete="tel"
                                 keyboardType="phone-pad"
                                 textContentType="telephoneNumber"
-                                onChangeText={setPhone}
+                                onChangeText={(text) => {
+                                    setPhone(text);
+                                    if (error) setError(null);
+                                }}
                                 value={phone}
                             />
 
@@ -120,6 +146,7 @@ export default function LoginScreen() {
                                 style={styles.primaryButton}
                                 onPress={sendVerification}
                                 activeOpacity={0.8}
+                                disabled={loading}
                             >
                                 {loading ? <ActivityIndicator color="white" /> : (
                                     <ThemedText style={styles.primaryButtonText}>
@@ -136,7 +163,10 @@ export default function LoginScreen() {
                                 placeholder="123456"
                                 placeholderTextColor="#888"
                                 keyboardType="number-pad"
-                                onChangeText={setVerificationCode}
+                                onChangeText={(text) => {
+                                    setVerificationCode(text);
+                                    if (error) setError(null);
+                                }}
                                 value={verificationCode}
                             />
 
@@ -144,6 +174,7 @@ export default function LoginScreen() {
                                 style={styles.primaryButton}
                                 onPress={confirmCode}
                                 activeOpacity={0.8}
+                                disabled={loading}
                             >
                                 {loading ? <ActivityIndicator color="white" /> : (
                                     <ThemedText style={styles.primaryButtonText}>
@@ -224,5 +255,19 @@ const styles = StyleSheet.create({
         marginTop: 40,
         flexDirection: 'row',
         justifyContent: 'center',
+    },
+    errorContainer: {
+        backgroundColor: '#FFE5E5',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#FF000033',
+    },
+    errorText: {
+        color: '#D00000',
+        fontSize: 14,
+        textAlign: 'center',
+        fontWeight: '500',
     }
 });

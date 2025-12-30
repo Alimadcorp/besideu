@@ -120,6 +120,13 @@ export async function POST(req, { params }) {
       .update(updates)
       .eq('id', dmId);
 
+    const { sendPushNotification } = await import('../../../../../../lib/pushNotifications');
+    sendPushNotification(otherUserId, {
+      title: user.username,
+      body: text || (image_url ? '📷 Sent an image' : '📍 Sent a meetup request'),
+      data: { type: 'new_message', dmId }
+    });
+
     return NextResponse.json({
       success: true,
       message_id: messageId,

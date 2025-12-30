@@ -94,14 +94,48 @@ function sha256(ascii: string) {
 const GLOBAL_SALT = 'BESIDEU_PRIVATE_SALT_2024_@_ALIMAD_CORP';
 
 /**
+ * Normalizes a phone number by handling common local prefixes and removing non-digits.
+ * Converts '03...' to '+923...' for Pakistan, and handles other basic normalization.
+ * @param phone Raw phone number string
+ * @returns Normalized phone number starting with '+'
+ */
+export function normalizePhoneNumber(phone: string): string {
+    if (!phone) return '';
+
+    // Remove all non-digits except '+'
+    let normalized = phone.trim().replace(/[^\d+]/g, '');
+
+    // Case: 03... -> +923... (Pakistan)
+    if (normalized.startsWith('03') && normalized.length === 11) {
+        normalized = '+92' + normalized.substring(1);
+    }
+    // Case: 00... -> +...
+    else if (normalized.startsWith('00')) {
+        normalized = '+' + normalized.substring(2);
+    }
+    // Case: Doesn't start with '+' and is likely local
+    else if (!normalized.startsWith('+')) {
+        // If it's 10 digits and starts with 3, assume it's Pakistan missing +92
+        if (normalized.startsWith('3') && normalized.length === 10) {
+            normalized = '+92' + normalized;
+        }
+    }
+    // Case: +9203... -> +923...
+    else if (normalized.startsWith('+920')) {
+        normalized = '+92' + normalized.substring(4);
+    }
+
+    return normalized;
+}
+
+/**
  * Normalizes and hashes a phone number for privacy-focused discovery.
  * @param phone Raw phone number string
  * @returns SHA-256 hash of (normalized_phone + salt)
  */
 export function hashPhone(phone: string): string {
-    if (!phone) return '';
-    // Normalize: remove all non-digits except '+'
-    const normalized = phone.trim().replace(/[^\d+]/g, '');
+    const normalized = normalizePhoneNumber(phone);
+    if (!normalized) return '';
     return sha256(normalized + GLOBAL_SALT);
 }
 

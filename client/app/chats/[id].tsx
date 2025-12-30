@@ -204,14 +204,14 @@ export default function ChatScreen() {
                             const response = await apiRequest(`/v1/messages/${id}/send`, {
                                 method: 'POST',
                                 body: JSON.stringify({
-                                    text: '📍 I sent a meetup request!',
+                                    text: 'I sent a meetup request!',
                                     meetup: true,
                                     timestamp: new Date().toISOString(),
                                 }),
                             });
                             const newMessage: Message = {
                                 id: response.message_id,
-                                text: '📍 I sent a meetup request!',
+                                text: 'I sent a meetup request!',
                                 sender_id: user!.id,
                                 timestamp: response.timestamp,
                                 meetup_request: {
@@ -297,7 +297,8 @@ export default function ChatScreen() {
                 ]}>
                 <View style={[
                     styles.messageBubble,
-                    isMe ? { backgroundColor: theme.tint } : { backgroundColor: theme.icon },
+                    isMe ? { backgroundColor: theme.tint } : { backgroundColor: 'rgba(0,0,0,0.05)' },
+                    isMe ? styles.myBubbleRadius : styles.theirBubbleRadius,
                     item.meetup_request ? styles.meetupBubble : {}
                 ]}>
                     {item.image_url && (
@@ -308,31 +309,35 @@ export default function ChatScreen() {
                         />
                     )}
                     {item.text ? (
-                        <ThemedText style={[styles.messageText, isMe ? { color: 'white' } : { color: theme.background }]}>
+                        <ThemedText style={[styles.messageText, isMe ? { color: 'white' } : { color: theme.text }]}>
                             {item.text}
                         </ThemedText>
                     ) : null}
+
+                    <View style={styles.messageFooter}>
+                        <ThemedText style={[styles.timestamp, isMe ? { color: 'rgba(255,255,255,0.7)' } : { color: 'rgba(0,0,0,0.4)' }]}>
+                            {formatDistanceToNow(new Date(item.timestamp), { addSuffix: false })}
+                        </ThemedText>
+                    </View>
                 </View>
 
                 {item.reactions && Object.keys(item.reactions).length > 0 && (
-                    <View style={[styles.reactionContainer, isMe ? { right: 0 } : { left: 0 }]}>
-                        <ThemedText style={{ fontSize: 12 }}>
+                    <View style={[styles.reactionContainer, isMe ? { right: 4 } : { left: 4 }]}>
+                        <ThemedText style={{ fontSize: 13 }}>
                             {Object.values(item.reactions).join('')}
                         </ThemedText>
                     </View>
                 )}
 
-                <ThemedText style={styles.timestamp}>
-                    {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                </ThemedText>
-
                 {item.meetup_request && (
-                    <View style={[styles.meetupContainer, { borderColor: theme.tint }]}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 }}>
-                            <IconSymbol name="location.circle" size={20} color={theme.text} />
+                    <View style={[styles.meetupContainer, { borderColor: theme.tint, backgroundColor: theme.background }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <IconSymbol name="location.circle.fill" size={22} color={theme.tint} />
                             <ThemedText type="defaultSemiBold">Meetup Request</ThemedText>
                         </View>
-                        <ThemedText style={{ fontSize: 12, marginBottom: 10 }}>Status: {item.meetup_request.status.toUpperCase()}</ThemedText>
+                        <ThemedText style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>
+                            Status: <ThemedText type="defaultSemiBold" style={{ textTransform: 'uppercase', fontSize: 12 }}>{item.meetup_request.status}</ThemedText>
+                        </ThemedText>
 
                         {item.meetup_request.status === 'pending' && !isMe && (
                             <TouchableOpacity
@@ -344,7 +349,10 @@ export default function ChatScreen() {
                         )}
 
                         {item.meetup_request.status === 'accepted' && (
-                            <ThemedText style={{ color: 'green', marginTop: 5, fontWeight: 'bold' }}>📍 Location Shared</ThemedText>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <IconSymbol name="checkmark.circle.fill" size={16} color="#34C759" />
+                                <ThemedText style={{ color: '#34C759', fontWeight: 'bold' }}>Location Shared</ThemedText>
+                            </View>
                         )}
                     </View>
                 )}
@@ -369,7 +377,7 @@ export default function ChatScreen() {
             <Stack.Screen
                 options={{
                     headerTitle: () => (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                             <View style={[styles.headerAvatar, { backgroundColor: theme.tint }]}>
                                 {chatUser?.avatar_url ? (
                                     <Image source={{ uri: chatUser.avatar_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
@@ -378,16 +386,20 @@ export default function ChatScreen() {
                                 )}
                             </View>
                             <View>
-                                <ThemedText type="defaultSemiBold">{chatUser?.real_name || chatUser?.username}</ThemedText>
-                                <ThemedText style={{ fontSize: 10, opacity: 0.6 }}>@{chatUser?.username}</ThemedText>
+                                <ThemedText type="defaultSemiBold" style={{ fontSize: 16 }}>{chatUser?.real_name || chatUser?.username}</ThemedText>
+                                <ThemedText style={{ fontSize: 11, opacity: 0.5 }}>online</ThemedText>
                             </View>
                         </View>
                     ),
                     headerRight: () => (
-                        <TouchableOpacity onPress={requestMeetup} style={{ marginRight: 10 }}>
-                            <IconSymbol name="location.circle" size={24} color={theme.tint} />
+                        <TouchableOpacity onPress={requestMeetup} style={styles.headerActionBtn}>
+                            <IconSymbol name="location.circle.fill" size={24} color={theme.tint} />
                         </TouchableOpacity>
-                    )
+                    ),
+                    headerTitleAlign: 'left',
+                    headerBackVisible: true,
+                    headerShadowVisible: false,
+                    headerStyle: { backgroundColor: theme.background }
                 }}
             />
 
@@ -398,16 +410,17 @@ export default function ChatScreen() {
                 keyExtractor={item => item.id}
                 inverted
                 contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
             />
 
-            <View style={[styles.inputContainer, { borderTopColor: theme.icon }]}>
+            <View style={[styles.inputContainer, { borderTopColor: 'rgba(0,0,0,0.05)', backgroundColor: theme.background }]}>
                 <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
                     <IconSymbol size={24} name="camera.fill" color={theme.icon} />
                 </TouchableOpacity>
                 <TextInput
-                    style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                    placeholder="Type a message..."
-                    placeholderTextColor="#888"
+                    style={[styles.input, { color: theme.text, backgroundColor: 'rgba(0,0,0,0.03)', borderColor: 'transparent' }]}
+                    placeholder="Message..."
+                    placeholderTextColor="#999"
                     value={inputText}
                     onChangeText={setInputText}
                     multiline
@@ -415,9 +428,13 @@ export default function ChatScreen() {
                 <TouchableOpacity
                     onPress={() => sendMessage()}
                     disabled={sending || (!inputText.trim())}
-                    style={[styles.sendButton, { opacity: sending || !inputText.trim() ? 0.5 : 1 }]}
+                    style={[styles.sendButton, { opacity: sending || !inputText.trim() ? 0.3 : 1 }]}
                 >
-                    <IconSymbol size={28} name="arrow.up.circle.fill" color={theme.tint} />
+                    {sending && !inputText.trim() ? (
+                        <ActivityIndicator size="small" color={theme.tint} />
+                    ) : (
+                        <IconSymbol size={32} name="arrow.up.circle.fill" color={theme.tint} />
+                    )}
                 </TouchableOpacity>
             </View>
         </KeyboardAvoidingView>
@@ -450,29 +467,48 @@ const styles = StyleSheet.create({
     },
     messageBubble: {
         padding: 12,
+        paddingHorizontal: 16,
         borderRadius: 20,
-        marginBottom: 5,
+        marginBottom: 2,
         overflow: 'hidden',
     },
+    myBubbleRadius: {
+        borderBottomRightRadius: 4,
+    },
+    theirBubbleRadius: {
+        borderBottomLeftRadius: 4,
+    },
+    messageFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginTop: 4,
+        gap: 4,
+    },
     messageImage: {
-        width: 200,
-        height: 200,
-        borderRadius: 15,
-        marginBottom: 5,
+        width: 240,
+        height: 240,
+        borderRadius: 12,
+        marginBottom: 8,
     },
     messageText: {
-        fontSize: 16,
+        fontSize: 15,
+        lineHeight: 20,
     },
     timestamp: {
         fontSize: 10,
-        opacity: 0.6,
-        marginHorizontal: 5,
+        opacity: 0.5,
     },
     meetupContainer: {
-        marginTop: 5,
-        padding: 10,
-        backgroundColor: 'rgba(238, 238, 238, 0.8)',
-        borderRadius: 10
+        marginTop: 8,
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 1,
     },
     inputContainer: {
         flexDirection: 'row',
@@ -526,17 +562,26 @@ const styles = StyleSheet.create({
         shadowRadius: 2,
         elevation: 2
     },
-    headerAvatar: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
     headerAvatarText: {
         color: 'white',
         fontSize: 14,
         fontWeight: 'bold',
+    },
+    headerAvatar: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    headerActionBtn: {
+        marginRight: 10,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,0,0,0.03)',
+        justifyContent: 'center',
+        alignItems: 'center',
     }
 });

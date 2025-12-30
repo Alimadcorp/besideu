@@ -11,29 +11,46 @@ export async function PUT(req) {
 
     try {
         const body = await req.json();
-        const { real_name, email, preferences, avatar_url } = body;
+        const { real_name, email, preferences, avatar_url, expo_push_token } = body;
+
+        // Fetch current user from DB to get firebase_uid
+        const { data: dbUser, error: dbErr } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+        if (dbErr || !dbUser) {
+            return NextResponse.json({ error: 'User not found', code: 'not_found' }, { status: 404 });
+        }
 
         const updates = {};
         if (real_name !== undefined) updates.real_name = real_name;
         if (email !== undefined) updates.email = email;
         if (preferences !== undefined) updates.preferences = preferences;
         if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+        if (expo_push_token !== undefined) updates.expo_push_token = expo_push_token;
 
         if (Object.keys(updates).length === 0) {
             return NextResponse.json({ error: 'No fields to update', code: 'bad_request' }, { status: 400 });
         }
 
-        // If email is being updated, sync with Firebase
-        if (email && email !== user.email) {
+        // Sync with Firebase if email or name changes
+        if ((email && email !== dbUser.email) || (real_name && real_name !== dbUser.real_name)) {
             const admin = getFirebaseAdmin();
-            if (admin && user.firebase_uid) {
+            if (admin && dbUser.firebase_uid) {
                 try {
-                    await admin.auth().updateUser(user.firebase_uid, {
-                        email: email,
-                        emailVerified: false // Reset verification status on email change
-                    });
+                    const fbUpdate = {};
+                    if (email && email !== dbUser.email) {
+                        fbUpdate.email = email;
+                        fbUpdate.emailVerified = false;
+                    }
+                    if (real_name && real_name !== dbUser.real_name) {
+                        fbUpdate.displayName = real_name;
+                    }
+                    await admin.auth().updateUser(dbUser.firebase_uid, fbUpdate);
                 } catch (fbErr) {
-                    console.error('[user/settings] Firebase email sync failed', fbErr);
+                    console.error('[user/settings] Firebase sync failed', fbErr);
                 }
             }
         }
