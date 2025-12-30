@@ -8,13 +8,16 @@ type User = {
     id: string;
     phone: string;
     username: string;
+    email?: string;
+    avatar_url?: string;
+    real_name?: string;
 };
 
 type AuthContextType = {
     user: User | null;
     isLoading: boolean;
     signIn: (firebaseToken: string) => Promise<void>;
-    signUp: (firebaseToken: string, username: string, realName: string) => Promise<void>;
+    signUp: (firebaseToken: string, username: string, realName: string, email?: string) => Promise<void>;
     signOut: () => Promise<void>;
 };
 
@@ -78,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }
 
-    async function signUp(firebaseToken: string, username: string, realName: string) {
+    async function signUp(firebaseToken: string, username: string, realName: string, email?: string) {
         try {
             const data = await apiRequest('/auth/signup', {
                 method: 'POST',
@@ -86,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     firebase_token: firebaseToken,
                     username,
                     real_name: realName,
+                    email,
                 }),
                 requiresAuth: false,
             });

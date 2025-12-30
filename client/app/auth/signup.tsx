@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, Link, useLocalSearchParams } from 'expo-router';
 import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,8 +11,11 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function SignupScreen() {
+    const { token } = useLocalSearchParams<{ token: string }>();
+
     const [username, setUsername] = useState('');
     const [realName, setRealName] = useState('');
+    const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [verificationCode, setVerificationCode] = useState('');
     const [verificationId, setVerificationId] = useState<string | null>(null);
@@ -25,9 +28,11 @@ export default function SignupScreen() {
 
     const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifierModal>(null);
 
+    const isProfileCompletion = !!token;
+
     const sendVerification = async () => {
-        if (!phone || !username || !realName) {
-            Alert.alert('Error', 'Please fill in all fields');
+        if (!phone) {
+            Alert.alert('Error', 'Please enter a phone number');
             return;
         }
         setLoading(true);
@@ -42,7 +47,7 @@ export default function SignupScreen() {
                 recaptchaVerifier.current!
             );
             setVerificationId(verificationId);
-            Alert.alert('Success', 'Verification code has been sent to your phone.');
+            Alert.alert('Success', 'Verification code has been sent.');
         } catch (err: any) {
             Alert.alert('Error', err.message);
         } finally {
@@ -50,9 +55,13 @@ export default function SignupScreen() {
         }
     };
 
-    const confirmCode = async () => {
+    const confirmCodeAndSignup = async () => {
         if (!verificationCode || !verificationId) {
             Alert.alert('Error', 'Please enter the verification code');
+            return;
+        }
+        if (!username || !realName) {
+            Alert.alert('Error', 'Please fill in required fields');
             return;
         }
 
@@ -65,9 +74,25 @@ export default function SignupScreen() {
             const userCredential = await auth.signInWithCredential(credential);
             const idToken = await userCredential.user!.getIdToken();
 
-            await signUp(idToken, username, realName);
+            await signUp(idToken, username, realName, email);
         } catch (err: any) {
             Alert.alert('Error', `Signup failed: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const completeProfile = async () => {
+        if (!username || !realName) {
+            Alert.alert('Error', 'Please fill in required fields');
+            return;
+        }
+        setLoading(true);
+        try {
+            await signUp(token, username, realName, email);
+        } catch (err: any) {
+            Alert.alert('Error', `Profile creation failed: ${err.message}`);
+        } finally {
             setLoading(false);
         }
     };
@@ -78,18 +103,25 @@ export default function SignupScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1, justifyContent: 'center' }}
             >
-                <FirebaseRecaptchaVerifierModal
-                    ref={recaptchaVerifier}
-                    firebaseConfig={firebase.app().options}
-                />
+                {!isProfileCompletion && (
+                    <FirebaseRecaptchaVerifierModal
+                        ref={recaptchaVerifier}
+                        firebaseConfig={firebase.app().options}
+                    />
+                )}
 
                 <View style={styles.content}>
-                    <ThemedText type="title" style={styles.title}>Create Account</ThemedText>
-                    <ThemedText style={styles.subtitle}>Join BesideU today</ThemedText>
+                    <ThemedText type="title" style={styles.title}>
+                        {isProfileCompletion ? 'Complete Profile' : 'Create Account'}
+                    </ThemedText>
+                    <ThemedText style={styles.subtitle}>
+                        {isProfileCompletion ? 'Just a few more details' : 'Join BesideU today'}
+                    </ThemedText>
 
-                    {!verificationId ? (
+                    {/* Common Fields */}
+                    {(verificationId || isProfileCompletion) && (
                         <>
-                            <ThemedText style={styles.label}>Real Name</ThemedText>
+                            <ThemedText style={styles.label}>Real Name *</ThemedText>
                             <TextInput
                                 style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
                                 placeholder="John Doe"
@@ -98,7 +130,7 @@ export default function SignupScreen() {
                                 value={realName}
                             />
 
-                            <ThemedText style={styles.label}>Username</ThemedText>
+                            <ThemedText style={styles.label}>Username *</ThemedText>
                             <TextInput
                                 style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
                                 placeholder="johndoe"
@@ -108,6 +140,22 @@ export default function SignupScreen() {
                                 value={username}
                             />
 
+                            <ThemedText style={styles.label}>Email (Optional)</ThemedText>
+                            <TextInput
+                                style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
+                                placeholder="john@example.com"
+                                placeholderTextColor="#888"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                onChangeText={setEmail}
+                                value={email}
+                            />
+                        </>
+                    )}
+
+                    {/* Flow A: Direct Signup (Phone Input) */}
+                    {!isProfileCompletion && !verificationId && (
+                        <>
                             <ThemedText style={styles.label}>Phone Number</ThemedText>
                             <TextInput
                                 style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
@@ -119,20 +167,14 @@ export default function SignupScreen() {
                                 onChangeText={setPhone}
                                 value={phone}
                             />
-
-                            <TouchableOpacity
-                                style={styles.primaryButton}
-                                onPress={sendVerification}
-                                activeOpacity={0.8}
-                            >
-                                {loading ? <ActivityIndicator color="white" /> : (
-                                    <ThemedText style={styles.primaryButtonText}>
-                                        Send Verification Code
-                                    </ThemedText>
-                                )}
+                            <TouchableOpacity style={styles.primaryButton} onPress={sendVerification}>
+                                {loading ? <ActivityIndicator color="white" /> : <ThemedText style={styles.primaryButtonText}>Verify Phone</ThemedText>}
                             </TouchableOpacity>
                         </>
-                    ) : (
+                    )}
+
+                    {/* Flow A: Verification Code */}
+                    {!isProfileCompletion && verificationId && (
                         <>
                             <ThemedText style={styles.label}>Verification Code</ThemedText>
                             <TextInput
@@ -143,27 +185,27 @@ export default function SignupScreen() {
                                 onChangeText={setVerificationCode}
                                 value={verificationCode}
                             />
-
-                            <TouchableOpacity
-                                style={styles.primaryButton}
-                                onPress={confirmCode}
-                                activeOpacity={0.8}
-                            >
-                                {loading ? <ActivityIndicator color="white" /> : (
-                                    <ThemedText style={styles.primaryButtonText}>
-                                        Confirm Code
-                                    </ThemedText>
-                                )}
+                            <TouchableOpacity style={styles.primaryButton} onPress={confirmCodeAndSignup}>
+                                {loading ? <ActivityIndicator color="white" /> : <ThemedText style={styles.primaryButtonText}>Create Account</ThemedText>}
                             </TouchableOpacity>
                         </>
                     )}
 
-                    <View style={styles.footer}>
-                        <ThemedText>Already have an account? </ThemedText>
-                        <Link href="/auth/login">
-                            <ThemedText style={{ color: theme.tint, fontWeight: 'bold' }}>Sign In</ThemedText>
-                        </Link>
-                    </View>
+                    {/* Flow B: Complete Profile */}
+                    {isProfileCompletion && (
+                        <TouchableOpacity style={styles.primaryButton} onPress={completeProfile}>
+                            {loading ? <ActivityIndicator color="white" /> : <ThemedText style={styles.primaryButtonText}>Finish Setup</ThemedText>}
+                        </TouchableOpacity>
+                    )}
+
+                    {!isProfileCompletion && (
+                        <View style={styles.footer}>
+                            <ThemedText>Already have an account? </ThemedText>
+                            <Link href="/auth/login">
+                                <ThemedText style={{ color: theme.tint, fontWeight: 'bold' }}>Sign In</ThemedText>
+                            </Link>
+                        </View>
+                    )}
                 </View>
             </KeyboardAvoidingView>
         </ThemedView>

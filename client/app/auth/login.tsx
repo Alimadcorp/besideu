@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { Link } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
 import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 
 import { ThemedText } from '@/components/themed-text';
@@ -17,6 +17,7 @@ export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
 
     const { signIn } = useAuth();
+    const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
@@ -65,8 +66,22 @@ export default function LoginScreen() {
 
             await signIn(idToken);
         } catch (err: any) {
-            Alert.alert('Error', `Login failed: ${err.message}`);
-            console.error(err);
+            console.log('Login error details:', err);
+            // Check if error indicates user not found (404)
+            if (err.message && (err.message.includes('User not found') || err.message.includes('404'))) {
+                // Redirect to Signup (Complete Profile) passing the token
+                // We need the token again. It was just generated. 
+                // Wait, getting ID token again is cheap.
+                const currentUser = auth.currentUser;
+                if (currentUser) {
+                    const token = await currentUser.getIdToken();
+                    console.log('Redirecting to signup with token');
+                    router.push({ pathname: '/auth/signup', params: { token } });
+                }
+            } else {
+                Alert.alert('Error', `Login failed: ${err.message}`);
+                console.error(err);
+            }
         } finally {
             setLoading(false);
         }

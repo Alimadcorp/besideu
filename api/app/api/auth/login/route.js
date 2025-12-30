@@ -78,6 +78,9 @@ export async function POST(req) {
         id: user.id,
         phone: user.phone,
         username: user.username,
+        email: user.email,
+        avatar_url: user.avatar_url,
+        real_name: user.real_name,
       },
     });
   } catch (err) {

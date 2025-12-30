@@ -30,10 +30,47 @@ export default function ContactsScreen() {
 
     const fetchContactsList = useCallback(async () => {
         try {
-            const data = await apiRequest('/v1/contacts/list');
-            setContacts(data.matched);
+            // 1. Fetch matches from server (Hashes, UserIDs, Usernames)
+            const serverData = await apiRequest('/v1/contacts/list');
+            const matches = serverData.matched || [];
+
+            // 2. Read local contacts to resolve "Real Name" from Hash
+            let hashToName = new Map<string, string>();
+
+            // Check permission first without requesting (don't annoy user on load if they denied before)
+            // Or just try-catch request?
+            const { status } = await Contacts.getPermissionsAsync();
+
+            if (status === 'granted') {
+                const { data } = await Contacts.getContactsAsync({
+                    fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+                });
+
+                data.forEach(c => {
+                    if (c.phoneNumbers) {
+                        c.phoneNumbers.forEach(p => {
+                            const h = hashPhone(p.number || '');
+                            if (h && c.name) {
+                                hashToName.set(h, c.name);
+                            }
+                        });
+                    }
+                });
+            }
+
+            // 3. Merge
+            const merged = matches.map((m: any) => ({
+                user_id: m.user_id,
+                username: m.username,
+                // Resolve name locally using the returned hash
+                contact_name: hashToName.get(m.hash) || m.username,
+                is_friend: m.is_friend,
+                phone: m.hash
+            }));
+
+            setContacts(merged);
         } catch (error) {
-            console.error('Failed to fetch contacts list:', error);
+            console.error('Failed to fetch/map contacts:', error);
         } finally {
             setLoading(false);
         }
@@ -45,30 +82,30 @@ export default function ContactsScreen() {
             const { status } = await Contacts.requestPermissionsAsync();
             if (status === 'granted') {
                 const { data } = await Contacts.getContactsAsync({
-                    fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+                    fields: [Contacts.Fields.PhoneNumbers],
                 });
 
+                const allHashes: string[] = [];
                 if (data.length > 0) {
-                    // Format contacts for API - Hashing for privacy!
-                    const formattedContacts = data.map(c => ({
-                        name: c.name || 'Unknown',
-                        phone: c.phoneNumbers?.map(p => hashPhone(p.number || '')).filter(Boolean) || []
-                    })).filter(c => c.phone.length > 0);
-
-                    await apiRequest('/v1/contacts/set', {
-                        method: 'PUT',
-                        body: JSON.stringify({
-                            contacts: formattedContacts,
-                            length: formattedContacts.length,
-                            timestamp: new Date().toISOString()
-                        })
+                    data.forEach(c => {
+                        c.phoneNumbers?.forEach(p => {
+                            const h = hashPhone(p.number || '');
+                            if (h) allHashes.push(h);
+                        });
                     });
-
-                    Alert.alert('Success', 'Contacts synced!');
-                    fetchContactsList(); // Refresh list
-                } else {
-                    Alert.alert('Info', 'No contacts found on device.');
                 }
+
+                // Send ONLY hashes to server
+                await apiRequest('/v1/contacts/set', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        hashes: allHashes,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+
+                Alert.alert('Success', 'Contacts synced!');
+                fetchContactsList(); // Refresh list to update names/matches
             } else {
                 Alert.alert('Permission missing', 'Contacts permission is required to sync.');
             }

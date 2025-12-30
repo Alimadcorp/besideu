@@ -283,16 +283,16 @@ const styles = StyleSheet.create({
         marginBottom: 40,
     },
     avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 128,
+        height: 128,
+        borderRadius: 64,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 15,
+        marginBottom: 0,
     },
     avatarText: {
         color: '#000',
-        fontSize: 50,
+        fontSize: 25,
         fontWeight: 'bold',
     },
     username: {

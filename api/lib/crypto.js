@@ -13,6 +13,7 @@ export function hashPhone(phone) {
     const normalized = phone.trim().replace(/[^\d+]/g, '');
     return crypto.createHash('sha256').update(normalized + GLOBAL_SALT).digest('hex');
 }
+console.log(hashPhone("+923488747307"))
 
 /**
  * Generates a privacy-preserving location hash from coordinates.

@@ -21,7 +21,8 @@ ALTER TABLE user_locations ALTER COLUMN geohash DROP NOT NULL;
 
 -- 3. Modify contacts table structure if needed (JSONB structure)
 -- The contacts table stores JSONB, so no schema change is strictly required, 
--- but the application logic now expects { "name": "...", "phone_hash": [...] } instead of "phone": [...]
+-- but the application logic now expects an array of strings (hashes) ["hash1", "hash2", ...] for maximum privacy.
+-- No schema change needed as JSONB supports arrays.
 
 -- 4. Clean up old data (Optional)
 -- UPDATE user_locations SET location_hash = NULL WHERE location_hash IS NULL;

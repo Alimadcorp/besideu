@@ -7,7 +7,7 @@ import { hashPhone } from '../../../../lib/crypto';
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { firebase_token: firebaseToken, username, real_name: realName } = body || {};
+    const { firebase_token: firebaseToken, username, real_name: realName, email } = body || {};
 
     if (!firebaseToken || !username || !realName) {
       return NextResponse.json(
@@ -28,6 +28,7 @@ export async function POST(req) {
     const decoded = await admin.auth().verifyIdToken(firebaseToken);
     const phone = decoded.phone_number;
     const firebaseUid = decoded.uid;
+    const picture = decoded.picture; // PFP from Firebase
 
     if (!phone) {
       return NextResponse.json(
@@ -64,6 +65,9 @@ export async function POST(req) {
           id: existingUserByPhone.id,
           phone: existingUserByPhone.phone,
           username: existingUserByPhone.username,
+          email: existingUserByPhone.email,
+          avatar_url: existingUserByPhone.avatar_url,
+          real_name: existingUserByPhone.real_name,
         },
       });
     }
@@ -100,6 +104,8 @@ export async function POST(req) {
         username,
         real_name: realName,
         firebase_uid: firebaseUid,
+        email: email || null,
+        avatar_url: picture || null,
       })
       .select('*')
       .single();
@@ -125,6 +131,9 @@ export async function POST(req) {
         id: newUser.id,
         phone: newUser.phone,
         username: newUser.username,
+        email: newUser.email,
+        avatar_url: newUser.avatar_url,
+        real_name: newUser.real_name,
       },
     });
   } catch (err) {

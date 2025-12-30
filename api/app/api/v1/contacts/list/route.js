@@ -12,7 +12,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const userFilter = searchParams.get('user');
 
-    // Load contacts data (which now contains hashes)
+    // Load contacts data (now raw hashes)
     const { data: contactsRow, error: contactsErr } = await supabaseAdmin
       .from('contacts')
       .select('contacts_data')
@@ -25,60 +25,76 @@ export async function GET(req) {
     }
 
     const contactsData = contactsRow?.contacts_data || [];
-    const hashes = new Set();
-    const nameByHash = {};
+    // contactsData should be string[] or empty. Sanitize just in case structure migrated.
+    const myHashes = new Set();
 
-    for (const c of contactsData) {
-      const name = c.name || null;
-      const rawPhones = Array.isArray(c.phone) ? c.phone : [c.phone];
-      for (const h of rawPhones) {
-        if (typeof h === 'string' && h.length === 64) {
-          hashes.add(h);
-          nameByHash[h] = name;
+    if (Array.isArray(contactsData)) {
+      for (const item of contactsData) {
+        if (typeof item === 'string') {
+          myHashes.add(item);
+        } else if (typeof item === 'object' && Array.isArray(item.phone)) {
+          // Backward compatibility for old structure { name, phone: [] }
+          item.phone.forEach(p => myHashes.add(p));
         }
       }
     }
 
     let matched = [];
-    if (hashes.size || userFilter) {
-      const hashList = Array.from(hashes);
-      const filters = [];
-      if (userFilter) filters.push(`id.eq.${userFilter}`);
-      if (hashList.length) filters.push(`phone_hash.in.(${hashList.map((h) => `"${h}"`).join(',')})`);
+    if (myHashes.size > 0 || userFilter) {
+      const hashList = Array.from(myHashes);
+      // Deduplicate results
+      const userMap = new Map();
 
-      const { data: users, error: usersErr } = await supabaseAdmin
-        .from('users')
-        .select('id, username, phone_hash')
-        .or(filters.join(','));
-
-      if (usersErr) {
-        console.error('[contacts/list] fetch users', usersErr);
-      } else {
-        // Load friendships to compute is_friend
-        const { data: friendships, error: friendsErr } = await supabaseAdmin
-          .from('friends')
-          .select('user_id_1, user_id_2')
-          .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`);
-
-        if (friendsErr) {
-          console.error('[contacts/list] fetch friends', friendsErr);
-        }
-
-        const friendIds = new Set();
-        for (const f of friendships || []) {
-          const otherId = f.user_id_1 === user.id ? f.user_id_2 : f.user_id_1;
-          friendIds.add(otherId);
-        }
-
-        matched = (users || []).map((u) => ({
-          user_id: u.id,
-          username: u.username,
-          // We no longer return the phone number for privacy, the client uses username anyway
-          contact_name: nameByHash[u.phone_hash] || null,
-          is_friend: friendIds.has(u.id),
-        }));
+      // 1a. Handle specific user filter
+      if (userFilter) {
+        const { data } = await supabaseAdmin
+          .from('users')
+          .select('id, username, phone_hash')
+          .eq('id', userFilter);
+        if (data) data.forEach(u => userMap.set(u.id, u));
       }
+
+      // 1b. Handle Hash List using RPC (Efficient, Single Query, No URL limit)
+      if (hashList.length > 0) {
+        const { data, error } = await supabaseAdmin.rpc('match_contact_hashes', {
+          hashes: hashList
+        });
+
+        if (error) {
+          console.error('[contacts/list] rpc match error', error);
+          // Fallback to chunked parsing if RPC missing? No, we assume migration ran.
+        } else if (data) {
+          data.forEach(u => userMap.set(u.id, u));
+        }
+      }
+
+      const users = Array.from(userMap.values()).filter(u => u.id !== user.id);
+
+      // 2. Fetch Friend Status
+      const { data: friendships, error: friendsErr } = await supabaseAdmin
+        .from('friends')
+        .select('user_id_1, user_id_2')
+        .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`);
+      if (friendsErr) {
+        console.error('[contacts/list] fetch friends', friendsErr);
+      }
+
+      const friendIds = new Set();
+      for (const f of friendships || []) {
+        const otherId = f.user_id_1 === user.id ? f.user_id_2 : f.user_id_1;
+        friendIds.add(otherId);
+      }
+
+      // 3. Construct Response
+      // Important: Return the hash so client can map it to a name.
+      matched = (users || []).map((u) => ({
+        user_id: u.id,
+        username: u.username,
+        hash: u.phone_hash, // Client uses this to map to real name
+        is_friend: friendIds.has(u.id),
+      }));
     }
+
 
     return NextResponse.json({ matched });
   } catch (err) {
