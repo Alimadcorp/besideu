@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await storeUser(data.user);
             setUser(data.user);
             connectWebSocket();
-            registerPush(); // Run in background
+            registerPush();
         } catch (error) {
             console.error('Sign in failed', error);
             throw error;
@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await storeUser(data.user);
             setUser(data.user);
             connectWebSocket();
-            registerPush(); // Run in background
+            registerPush();
         } catch (error) {
             console.error('Sign up failed', error);
             throw error;
@@ -117,7 +117,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function signOut() {
         try {
-            // Remove push token on logout for security
             await apiRequest('/v1/user/settings', {
                 method: 'PUT',
                 body: JSON.stringify({ expo_push_token: null }),

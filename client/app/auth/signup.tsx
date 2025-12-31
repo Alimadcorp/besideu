@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Link, useLocalSearchParams } from 'expo-router';
 import FirebaseRecaptchaVerifierModal, { FirebaseRecaptchaVerifier } from '@/components/FirebaseRecaptcha';
 
@@ -27,7 +28,7 @@ export default function SignupScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
-
+    const insets = useSafeAreaInsets();
     const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifier>(null);
 
     const isProfileCompletion = !!token;
@@ -41,6 +42,7 @@ export default function SignupScreen() {
         if (msg.includes('user-disabled')) return 'This account has been disabled.';
         if (msg.includes('Network request failed')) return 'Connection error. Check your internet.';
         if (msg.includes('Username already taken')) return 'This username is already taken. Try another.';
+        if (msg.includes('39') || msg.includes('auth/sms-quota-exceeded')) return 'Failed to send SMS, try again later or through a different phone number.';
         return msg;
     };
 
@@ -117,7 +119,7 @@ export default function SignupScreen() {
     };
 
     return (
-        <ThemedView style={styles.container}>
+        <ThemedView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1, justifyContent: 'center' }}

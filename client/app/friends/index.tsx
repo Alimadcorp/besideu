@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Link, Stack } from 'expo-router';
 import { Image } from 'expo-image';
 
@@ -24,10 +25,10 @@ export default function FriendsScreen() {
     const [friends, setFriends] = useState<Friend[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
     const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
+    const insets = useSafeAreaInsets();
 
     const fetchFriends = useCallback(async () => {
         try {
@@ -79,7 +80,10 @@ export default function FriendsScreen() {
                 router.push(`/chats/${item.id}` as any);
             }}
         >
-            <View style={styles.avatarContainer}>
+            <TouchableOpacity
+                style={styles.avatarContainer}
+                onPress={() => router.push(`/user/${item.friend_id}` as any)}
+            >
                 <View style={[styles.avatar, { backgroundColor: theme.tint, overflow: 'hidden' }]}>
                     {item.avatar_url ? (
                         <Image
@@ -96,9 +100,9 @@ export default function FriendsScreen() {
                         <ThemedText style={styles.badgeText}>{item.unread_count}</ThemedText>
                     </View>
                 )}
-            </View>
+            </TouchableOpacity>
             <View style={styles.userInfo}>
-                <ThemedText type="defaultSemiBold" style={styles.username}>
+                <ThemedText numberOfLines={1} type="defaultSemiBold" style={styles.username}>
                     {item.real_name || item.username}
                 </ThemedText>
                 <ThemedText style={styles.handle}>@{item.username}</ThemedText>
@@ -127,10 +131,10 @@ export default function FriendsScreen() {
                     data={friends}
                     keyExtractor={item => item.id}
                     renderItem={renderItem}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />}
                     ListHeaderComponent={
-                        <View style={styles.header}>
+                        <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
                             <View>
                                 <ThemedText type="title">Friends</ThemedText>
                                 <ThemedText style={styles.subtitle}>{friends.length} connections</ThemedText>
@@ -179,7 +183,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 60,
         paddingBottom: 25,
     },
     subtitle: {

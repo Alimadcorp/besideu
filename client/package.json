@@ -20,6 +20,7 @@
     "@types/react-native-dotenv": "^0.2.2",
     "date-fns": "^4.1.0",
     "expo": "~54.0.30",
+    "expo-background-fetch": "^14.0.9",
     "expo-blur": "~15.0.8",
     "expo-constants": "~18.0.12",
     "expo-contacts": "~15.0.11",

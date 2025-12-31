@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
@@ -32,6 +33,7 @@ export default function NotificationsScreen() {
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     const fetchRequests = useCallback(async () => {
         try {
@@ -71,17 +73,22 @@ export default function NotificationsScreen() {
 
     const renderRequest = ({ item, type }: { item: FriendRequest, type: 'incoming' | 'outgoing' }) => (
         <View style={styles.requestItem}>
-            <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
-                {item.avatar_url ? (
-                    <Image source={{ uri: item.avatar_url }} style={styles.avatarImg} contentFit="cover" />
-                ) : (
-                    <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
-                )}
-            </View>
-            <View style={styles.requestInfo}>
-                <ThemedText type="defaultSemiBold">{item.real_name || item.username}</ThemedText>
-                <ThemedText style={styles.subtitle}>@{item.username}</ThemedText>
-            </View>
+            <TouchableOpacity
+                style={{ flexDirection: 'row', flex: 1, alignItems: 'center', gap: 15 }}
+                onPress={() => router.push(`/user/${item.user_id}` as any)}
+            >
+                <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
+                    {item.avatar_url ? (
+                        <Image source={{ uri: item.avatar_url }} style={styles.avatarImg} contentFit="cover" />
+                    ) : (
+                        <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
+                    )}
+                </View>
+                <View style={styles.requestInfo}>
+                    <ThemedText type="defaultSemiBold">{item.real_name || item.username}</ThemedText>
+                    <ThemedText style={styles.subtitle}>@{item.username}</ThemedText>
+                </View>
+            </TouchableOpacity>
             <View style={styles.requestActions}>
                 {type === 'incoming' ? (
                     <>
@@ -112,12 +119,12 @@ export default function NotificationsScreen() {
 
     return (
         <ThemedView style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
                 <ThemedText type="title">Notifications</ThemedText>
             </View>
 
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />}
             >
                 {/* Nearby Alerts Placeholder */}
@@ -182,7 +189,6 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 20,
-        paddingTop: 60,
         paddingBottom: 20,
     },
     scrollContent: {

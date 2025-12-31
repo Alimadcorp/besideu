@@ -22,10 +22,10 @@ export async function GET(req) {
       ? Number(rangeParam)
       : null;
 
-    // Fetch current user's location hash
+    // Fetch current user's location hashes
     const { data: locationRow, error: locErr } = await supabaseAdmin
       .from('user_locations')
-      .select('location_hash')
+      .select('location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -37,14 +37,20 @@ export async function GET(req) {
       );
     }
 
-    if (!locationRow?.location_hash) {
+    if (!locationRow?.location_hash_100m || !locationRow?.location_hash_500m || !locationRow?.location_hash_1km || !locationRow?.location_hash_3km || !locationRow?.location_hash_5km) {
       return NextResponse.json(
         { error: 'Current user location not set', code: 'location_not_set' },
         { status: 400 },
       );
     }
 
-    const myLocationHash = locationRow.location_hash;
+    const myHashes = {
+      hash_100m: locationRow.location_hash_100m,
+      hash_500m: locationRow.location_hash_500m,
+      hash_1km: locationRow.location_hash_1km,
+      hash_3km: locationRow.location_hash_3km,
+      hash_5km: locationRow.location_hash_5km,
+    };
 
     // 1. Fetch current user's accepted friends IDs
     const { data: friendRows, error: friendErr } = await supabaseAdmin
@@ -68,12 +74,11 @@ export async function GET(req) {
       });
     }
 
-    // 2. Fetch users with the SAME location hash (same region) who ARE friends
+    // 2. Fetch friends with location data (fetch all friends, we'll filter by hash match in memory)
     const { data: candidates, error: candidatesErr } = await supabaseAdmin
       .from('user_locations')
-      .select('user_id, location_hash, users!inner ( username, real_name, preferences, avatar_url )')
+      .select('user_id, updated_at, location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km, users!inner ( username, real_name, preferences, avatar_url, is_online, last_online )')
       .neq('user_id', user.id)
-      .eq('location_hash', myLocationHash)
       .in('user_id', friendIds);
 
     if (candidatesErr) {
@@ -90,13 +95,38 @@ export async function GET(req) {
       // Filter out users who disabled location sharing
       if (row.users?.preferences?.share_location === false) continue;
 
+      // Determine distance tier based on which hash matches (check from smallest to largest)
+      // If hash_100m matches -> beside_you (100m)
+      // Else if hash_500m matches -> very_near (500m)
+      // Else if hash_1km matches -> near (1km)
+      // Else if hash_3km matches -> far (3km)
+      // Else if hash_5km matches -> very_far (5km)
+      // If none match, skip this user (they're not nearby)
+      let distance = null;
+      if (row.location_hash_100m === myHashes.hash_100m) {
+        distance = 'beside_you';
+      } else if (row.location_hash_500m === myHashes.hash_500m) {
+        distance = 'very_near';
+      } else if (row.location_hash_1km === myHashes.hash_1km) {
+        distance = 'near';
+      } else if (row.location_hash_3km === myHashes.hash_3km) {
+        distance = 'far';
+      } else if (row.location_hash_5km === myHashes.hash_5km) {
+        distance = 'very_far';
+      } else {
+        // No hash matches, user is outside 5km radius
+        continue;
+      }
+
       users.push({
         id: row.user_id,
         username: row.users?.username || null,
         real_name: row.users?.real_name || null,
         avatar_url: row.users?.avatar_url || null,
-        distance: 'near', // Fuzzy distance as per new privacy spec
-        // location_hash: row.location_hash, // REMOVED: Do not expose hash to client for non-friends to ensure fuzzy-only perception
+        distance,
+        is_online: row.users?.is_online || false,
+        last_online: row.users?.last_online || null,
+        location_shared_at: row.updated_at,
       });
     }
 

@@ -2,6 +2,8 @@ import { StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicat
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppState } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
@@ -11,6 +13,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiRequest } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
 import { Image } from 'expo-image';
+import { startBackgroundUpdater, stopBackgroundUpdater } from '@/utils/background-updater';
 
 type DM = {
   id: string;
@@ -28,6 +31,26 @@ type DM = {
 
 import { addSocketListener } from '@/utils/socket';
 
+const formatChatTime = (ts) => {
+  const date = new Date(ts);
+  const now = new Date();
+
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+
+  return date.toLocaleDateString("en-GB");
+};
+
 export default function ChatsScreen() {
   const [dms, setDms] = useState<DM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +59,7 @@ export default function ChatsScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const fetchChats = useCallback(async () => {
     if (!user) {
@@ -63,8 +87,11 @@ export default function ChatsScreen() {
     if (!user) return;
 
     fetchChats();
-    // Optional: Set up polling interval as backup
-    const interval = setInterval(fetchChats, 30000);
+
+    // Start background updater (fetches chats every 30s, location every 1min)
+    startBackgroundUpdater((chats) => {
+      setDms(chats || []);
+    });
 
     const removeListener = addSocketListener((msg) => {
       if (msg.type === 'new_message') {
@@ -74,9 +101,17 @@ export default function ChatsScreen() {
       }
     });
 
+    // Refresh on app state change (when app comes to foreground)
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        fetchChats();
+      }
+    });
+
     return () => {
-      clearInterval(interval);
+      stopBackgroundUpdater();
       removeListener();
+      subscription.remove();
     };
   }, [fetchChats, user]);
 
@@ -86,8 +121,10 @@ export default function ChatsScreen() {
       onPress={() => router.push(`/chats/${item.id}` as any)}
     >
       <View style={styles.avatarContainer}>
-        <View style={[styles.avatar, { backgroundColor: theme.tint, overflow: 'hidden' }]}>
-          {item.avatar_url ? (
+        <View style={[styles.avatar, { backgroundColor: (item as any).type === 'meeting' ? theme.text : theme.tint, overflow: 'hidden' }]}>
+          {(item as any).type === 'meeting' ? (
+            <IconSymbol name="person.3.fill" size={24} color={theme.background} />
+          ) : item.avatar_url ? (
             <Image source={{ uri: item.avatar_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
           ) : (
             <ThemedText style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</ThemedText>
@@ -99,13 +136,22 @@ export default function ChatsScreen() {
       </View>
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <ThemedText type="defaultSemiBold" style={styles.username}>
+          <ThemedText
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            type="defaultSemiBold"
+            style={styles.username}
+          >
             {item.real_name || item.username}
           </ThemedText>
-          <ThemedText style={styles.timestamp}>
-            {item.last_message?.timestamp ? formatDistanceToNow(new Date(item.last_message.timestamp), { addSuffix: true }) : ''}
+
+          <ThemedText numberOfLines={1} style={styles.timestamp}>
+            {item.last_message?.timestamp
+              ? formatChatTime(item.last_message.timestamp)
+              : ""}
           </ThemedText>
         </View>
+
         <View style={styles.messagePreview}>
           <ThemedText numberOfLines={1} style={[styles.messageText, item.unread_count > 0 && styles.unreadMessage]}>
             {item.last_message?.text || 'No messages yet'}
@@ -122,7 +168,7 @@ export default function ChatsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <ThemedText type="title">Chats</ThemedText>
       </View>
 
@@ -151,7 +197,10 @@ export default function ChatsScreen() {
               </TouchableOpacity>
             </View>
           }
-          contentContainerStyle={dms.length === 0 && styles.emptyList}
+          contentContainerStyle={[
+            dms.length === 0 && styles.emptyList,
+            { paddingBottom: insets.bottom + 80 }
+          ]}
         />
       )}
     </ThemedView>
@@ -164,7 +213,6 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60, // Safe area
     paddingBottom: 20,
   },
   chatItem: {
@@ -203,16 +251,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chatHeader: {
-    flexDirection: 'row',
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: 'space-between',
     marginBottom: 5,
   },
   username: {
+    width: "75%",
     fontSize: 16,
   },
   timestamp: {
-    fontSize: 12,
+    width: "25%",
+    textAlign: "right",
     opacity: 0.6,
+    fontSize: 12,
   },
   messagePreview: {
     flexDirection: 'row',

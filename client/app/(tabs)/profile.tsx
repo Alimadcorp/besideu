@@ -1,4 +1,5 @@
 import { StyleSheet, Switch, TouchableOpacity, ScrollView, Alert, View, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -19,6 +20,7 @@ export default function ProfileScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
+    const insets = useSafeAreaInsets();
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -146,6 +148,15 @@ export default function ProfileScreen() {
     }
 
     const [isEditNameModalVisible, setIsEditNameModalVisible] = useState(false);
+    const [isExpirationModalVisible, setIsExpirationModalVisible] = useState(false);
+    const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
+    const [isScheduleDatePickerVisible, setIsScheduleDatePickerVisible] = useState(false);
+    const [isScheduleStatusInputVisible, setIsScheduleStatusInputVisible] = useState(false);
+    const [isScheduleExpirationVisible, setIsScheduleExpirationVisible] = useState(false);
+    const [scheduledTime, setScheduledTime] = useState(new Date());
+    const [scheduledStatusText, setScheduledStatusText] = useState('');
+    const [editMode, setEditMode] = useState<{ field: string, label: string, multiline?: boolean } | null>(null);
+    const [tempValue, setTempValue] = useState('');
     const [tempName, setTempName] = useState('');
 
     const user = profile || authUser;
@@ -156,6 +167,53 @@ export default function ProfileScreen() {
             updateProfile({ real_name: tempName.trim() });
             setIsEditNameModalVisible(false);
         }
+    };
+
+    const handleUpdateField = () => {
+        if (editMode) {
+            updateProfile({ [editMode.field]: tempValue.trim() });
+            setEditMode(null);
+        }
+    };
+
+    const setExpiration = (hours: number | null) => {
+        const expiration = hours ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() : null;
+        updateProfile({ status_expiration: expiration });
+        setIsExpirationModalVisible(false);
+    };
+
+    const setSchedule = (hours: number | null) => {
+        if (hours === null) {
+            updateProfile({ scheduled_status: null, scheduled_status_at: null, scheduled_status_expiration: null });
+            setIsScheduleModalVisible(false);
+        } else {
+            const scheduleAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+            setScheduledTime(scheduleAt);
+            setIsScheduleModalVisible(false);
+            setIsScheduleStatusInputVisible(true);
+        }
+    };
+
+    const confirmScheduledStatus = () => {
+        if (!scheduledStatusText.trim()) {
+            Alert.alert('Error', 'Please enter a status message');
+            return;
+        }
+        setIsScheduleStatusInputVisible(false);
+        setIsScheduleExpirationVisible(true);
+    };
+
+    const setScheduledExpiration = (hours: number | null) => {
+        const expiration = hours ? new Date(scheduledTime.getTime() + hours * 60 * 60 * 1000).toISOString() : null;
+
+        updateProfile({
+            scheduled_status: scheduledStatusText.trim(),
+            scheduled_status_at: scheduledTime.toISOString(),
+            scheduled_status_expiration: expiration
+        });
+
+        setIsScheduleExpirationVisible(false);
+        setScheduledStatusText('');
     };
 
     const handleResendVerification = async () => {
@@ -204,7 +262,7 @@ export default function ProfileScreen() {
 
     return (
         <ThemedView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 80 }]}>
 
                 {/* Header */}
                 <View style={styles.header}>
@@ -231,10 +289,17 @@ export default function ProfileScreen() {
                             <IconSymbol name="pencil" size={14} color="#fff" />
                         </View>
                     </TouchableOpacity>
-                    <ThemedText type="title" style={styles.username}>
+                    <ThemedText numberOfLines={1} type="title" style={styles.username}>
                         {user?.real_name || 'User'}
                     </ThemedText>
                     <ThemedText style={styles.handle}>@{user?.username}</ThemedText>
+                    {user?.status && (
+                        <View style={[styles.statusBadge, { backgroundColor: theme.tint + '15' }]}>
+                            <ThemedText style={[styles.statusText, { color: theme.tint }]}>
+                                {user.status}
+                            </ThemedText>
+                        </View>
+                    )}
                     {saving && <ThemedText style={{ fontSize: 12, color: theme.tint, marginTop: 5 }}>Saving...</ThemedText>}
                 </View>
 
@@ -308,6 +373,48 @@ export default function ProfileScreen() {
                         <IconSymbol name="envelope" size={16} color={theme.icon} />
                     </TouchableOpacity>
 
+                    <TouchableOpacity
+                        style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                        onPress={() => {
+                            setTempValue(user?.status || '');
+                            setEditMode({ field: 'status', label: 'My Status' });
+                        }}
+                    >
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Current Status</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>{user?.status || 'What\'s on your mind?'}</ThemedText>
+                        </View>
+                        <IconSymbol name="pencil" size={16} color={theme.icon} />
+                    </TouchableOpacity>
+
+                    {user?.status && (
+                        <TouchableOpacity
+                            style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                            onPress={() => setIsExpirationModalVisible(true)}
+                        >
+                            <View>
+                                <ThemedText style={styles.rowLabel}>Status Expiration</ThemedText>
+                                <ThemedText style={styles.rowSubtext}>
+                                    {user.status_expiration ? `Expires ${new Date(user.status_expiration).toLocaleString()}` : 'Never expires'}
+                                </ThemedText>
+                            </View>
+                            <IconSymbol name="timer" size={16} color={theme.icon} />
+                        </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity
+                        style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                        onPress={() => setIsScheduleModalVisible(true)}
+                    >
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Scheduled Status</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>
+                                {user.scheduled_status ? `"${user.scheduled_status}" at ${new Date(user.scheduled_status_at).toLocaleString()}` : 'Plan a future update'}
+                            </ThemedText>
+                        </View>
+                        <IconSymbol name="calendar" size={16} color={theme.icon} />
+                    </TouchableOpacity>
+
                     {user?.email && !isEmailVerified && (
                         <View style={styles.verificationBox}>
                             <ThemedText style={styles.verificationText}>Email is not verified</ThemedText>
@@ -321,6 +428,85 @@ export default function ProfileScreen() {
                                 </ThemedText>
                             </TouchableOpacity>
                         </View>
+                    )}
+                </View>
+
+                {/* Public Profile Section */}
+                <View style={styles.section}>
+                    <ThemedText type="subtitle" style={styles.sectionTitle}>Public Profile</ThemedText>
+
+                    <TouchableOpacity
+                        style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                        onPress={() => {
+                            setTempValue(user?.bio || '');
+                            setEditMode({ field: 'bio', label: 'About Me', multiline: true });
+                        }}
+                    >
+                        <View style={{ flex: 1 }}>
+                            <ThemedText style={styles.rowLabel}>Bio</ThemedText>
+                            <ThemedText numberOfLines={2} style={styles.rowSubtext}>
+                                {user?.bio || 'Add a short bio about yourself'}
+                            </ThemedText>
+                        </View>
+                        <IconSymbol name="pencil" size={16} color={theme.icon} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                        onPress={() => {
+                            setTempValue(user?.website || '');
+                            setEditMode({ field: 'website', label: 'Website' });
+                        }}
+                    >
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Website</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>{user?.website || 'Add your website link'}</ThemedText>
+                        </View>
+                        <IconSymbol name="link" size={16} color={theme.icon} />
+                    </TouchableOpacity>
+
+                    <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Business Account</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>Display business info to everyone</ThemedText>
+                        </View>
+                        <Switch
+                            value={user?.is_business || false}
+                            onValueChange={(val) => updateProfile({ is_business: val })}
+                            trackColor={{ false: '#767577', true: theme.tint }}
+                        />
+                    </View>
+
+                    {user?.is_business && (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                                onPress={() => {
+                                    setTempValue(user?.business_type || '');
+                                    setEditMode({ field: 'business_type', label: 'Business Category' });
+                                }}
+                            >
+                                <View>
+                                    <ThemedText style={styles.rowLabel}>Category</ThemedText>
+                                    <ThemedText style={styles.rowSubtext}>{user?.business_type || 'e.g. Cafe, Tech, Art'}</ThemedText>
+                                </View>
+                                <IconSymbol name="tag" size={16} color={theme.icon} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                                onPress={() => {
+                                    setTempValue(user?.public_phone || '');
+                                    setEditMode({ field: 'public_phone', label: 'Public Contact Phone' });
+                                }}
+                            >
+                                <View>
+                                    <ThemedText style={styles.rowLabel}>Public Phone</ThemedText>
+                                    <ThemedText style={styles.rowSubtext}>{user?.public_phone || 'Add a phone number for customers'}</ThemedText>
+                                </View>
+                                <IconSymbol name="phone.fill" size={16} color={theme.icon} />
+                            </TouchableOpacity>
+                        </>
                     )}
                 </View>
 
@@ -366,6 +552,11 @@ export default function ProfileScreen() {
                 <View style={styles.section}>
                     <ThemedText type="subtitle" style={styles.sectionTitle}>Social</ThemedText>
 
+                    <TouchableOpacity style={[styles.row, { borderBottomColor: theme.icon }]} onPress={() => router.push('/meetings')}>
+                        <ThemedText style={styles.rowLabel}>Meetings</ThemedText>
+                        <IconSymbol name="chevron.right" size={20} color={theme.icon} />
+                    </TouchableOpacity>
+
                     <TouchableOpacity style={[styles.row, { borderBottomColor: theme.icon }]} onPress={navigateFriends}>
                         <ThemedText style={styles.rowLabel}>Manage Friends</ThemedText>
                         <IconSymbol name="chevron.right" size={20} color={theme.icon} />
@@ -396,6 +587,17 @@ export default function ProfileScreen() {
                         <ThemedText style={styles.rowValue}>Muhammad Ali</ThemedText>
                     </View>
                 </View>
+
+                {/* Business Tools */}
+                {user?.is_business && (
+                    <View style={styles.section}>
+                        <ThemedText type="subtitle" style={styles.sectionTitle}>Business Tools</ThemedText>
+                        <TouchableOpacity style={[styles.row, { borderBottomColor: theme.icon }]} onPress={() => router.push('/meetings/create')}>
+                            <ThemedText style={styles.rowLabel}>Create New Meeting</ThemedText>
+                            <IconSymbol name="calendar.badge.plus" size={20} color={theme.tint} />
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Logout */}
                 <TouchableOpacity style={[styles.logoutButton, { borderColor: 'red' }]} onPress={handleLogout}>
@@ -443,6 +645,294 @@ export default function ProfileScreen() {
                     </ThemedView>
                 </View>
             </Modal>
+
+            {/* Expiration Modal */}
+            <Modal
+                visible={isExpirationModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setIsExpirationModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <ThemedView style={styles.modalContent}>
+                        <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Clear Status After...</ThemedText>
+                        <View style={styles.presetList}>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setExpiration(1)}>
+                                <ThemedText>1 Hour</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setExpiration(4)}>
+                                <ThemedText>4 Hours</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setExpiration(24)}>
+                                <ThemedText>24 Hours</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setExpiration(null)}>
+                                <ThemedText style={{ color: 'red' }}>Never Clear</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.modalBtn, { marginTop: 10, alignSelf: 'flex-end' }]}
+                            onPress={() => setIsExpirationModalVisible(false)}
+                        >
+                            <ThemedText>Close</ThemedText>
+                        </TouchableOpacity>
+                    </ThemedView>
+                </View>
+            </Modal>
+
+            {/* Schedule Modal */}
+            <Modal
+                visible={isScheduleModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setIsScheduleModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <ThemedView style={styles.modalContent}>
+                        <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Schedule Status Update</ThemedText>
+                        <ThemedText style={{ marginBottom: 15, opacity: 0.7 }}>When should this go live?</ThemedText>
+                        <View style={styles.presetList}>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(1)}>
+                                <ThemedText>In 1 Hour</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(6)}>
+                                <ThemedText>In 6 Hours</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(24)}>
+                                <ThemedText>Tomorrow</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(48)}>
+                                <ThemedText>In 2 Days</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.presetBtn, { backgroundColor: theme.tint + '20' }]}
+                                onPress={() => {
+                                    setIsScheduleModalVisible(false);
+                                    setIsScheduleDatePickerVisible(true);
+                                }}
+                            >
+                                <ThemedText style={{ color: theme.tint, fontWeight: 'bold' }}>Custom Date & Time</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(null)}>
+                                <ThemedText style={{ color: 'red' }}>Clear Scheduled</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.modalBtn, { marginTop: 10, alignSelf: 'flex-end' }]}
+                            onPress={() => setIsScheduleModalVisible(false)}
+                        >
+                            <ThemedText>Close</ThemedText>
+                        </TouchableOpacity>
+                    </ThemedView>
+                </View>
+            </Modal>
+
+            {/* Custom Schedule Date Picker */}
+            {isScheduleDatePickerVisible && (
+                <Modal
+                    visible={isScheduleDatePickerVisible}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setIsScheduleDatePickerVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <ThemedView style={styles.modalContent}>
+                            <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Select Date & Time</ThemedText>
+
+                            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                                <TextInput
+                                    style={[styles.modalInput, { color: theme.text, borderColor: theme.icon + '40', textAlign: 'center' }]}
+                                    value={scheduledTime.toLocaleString()}
+                                    editable={false}
+                                />
+                                <ThemedText style={{ fontSize: 12, opacity: 0.6, marginTop: 5 }}>
+                                    Tap buttons below to adjust
+                                </ThemedText>
+                            </View>
+
+                            <View style={{ gap: 10, marginBottom: 20 }}>
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <TouchableOpacity
+                                        style={[styles.presetBtn, { backgroundColor: theme.icon + '10', flex: 1 }]}
+                                        onPress={() => {
+                                            const newDate = new Date(scheduledTime);
+                                            newDate.setHours(newDate.getHours() + 1);
+                                            setScheduledTime(newDate);
+                                        }}
+                                    >
+                                        <ThemedText>+1 Hour</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.presetBtn, { backgroundColor: theme.icon + '10', flex: 1 }]}
+                                        onPress={() => {
+                                            const newDate = new Date(scheduledTime);
+                                            newDate.setDate(newDate.getDate() + 1);
+                                            setScheduledTime(newDate);
+                                        }}
+                                    >
+                                        <ThemedText>+1 Day</ThemedText>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]}
+                                    onPress={() => setScheduledTime(new Date())}
+                                >
+                                    <ThemedText>Reset to Now</ThemedText>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity
+                                    style={[styles.modalBtn, { backgroundColor: theme.icon + '20' }]}
+                                    onPress={() => setIsScheduleDatePickerVisible(false)}
+                                >
+                                    <ThemedText>Cancel</ThemedText>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modalBtn, { backgroundColor: theme.tint }]}
+                                    onPress={() => {
+                                        const now = new Date();
+                                        const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+                                        if (scheduledTime <= now) {
+                                            Alert.alert('Invalid Time', 'Please select a future time');
+                                            return;
+                                        }
+                                        if (scheduledTime > sevenDays) {
+                                            Alert.alert('Too Far Ahead', 'You can only schedule up to 7 days in advance');
+                                            return;
+                                        }
+
+                                        setIsScheduleDatePickerVisible(false);
+                                        setIsScheduleStatusInputVisible(true);
+                                    }}
+                                >
+                                    <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Next</ThemedText>
+                                </TouchableOpacity>
+                            </View>
+                        </ThemedView>
+                    </View>
+                </Modal>
+            )}
+
+            {/* Status Input Modal */}
+            <Modal
+                visible={isScheduleStatusInputVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setIsScheduleStatusInputVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <ThemedView style={styles.modalContent}>
+                        <ThemedText type="subtitle" style={{ marginBottom: 15 }}>What's Your Status?</ThemedText>
+                        <ThemedText style={{ marginBottom: 15, opacity: 0.7 }}>
+                            This will go live on {scheduledTime.toLocaleString()}
+                        </ThemedText>
+                        <TextInput
+                            style={[styles.modalInput, { color: theme.text, borderColor: theme.icon + '40', height: 100, textAlignVertical: 'top' }]}
+                            value={scheduledStatusText}
+                            onChangeText={setScheduledStatusText}
+                            placeholder="Enter your status..."
+                            placeholderTextColor="#888"
+                            multiline
+                            autoFocus
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: theme.icon + '20' }]}
+                                onPress={() => setIsScheduleStatusInputVisible(false)}
+                            >
+                                <ThemedText>Cancel</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: theme.tint }]}
+                                onPress={confirmScheduledStatus}
+                            >
+                                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Next</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                    </ThemedView>
+                </View>
+            </Modal>
+
+            {/* Schedule Expiration Modal */}
+            <Modal
+                visible={isScheduleExpirationVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setIsScheduleExpirationVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <ThemedView style={styles.modalContent}>
+                        <ThemedText type="subtitle" style={{ marginBottom: 15 }}>When Should It Expire?</ThemedText>
+                        <ThemedText style={{ marginBottom: 15, opacity: 0.7 }}>
+                            After going live on {scheduledTime.toLocaleString()}
+                        </ThemedText>
+                        <View style={styles.presetList}>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setScheduledExpiration(1)}>
+                                <ThemedText>1 Hour After</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setScheduledExpiration(4)}>
+                                <ThemedText>4 Hours After</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setScheduledExpiration(24)}>
+                                <ThemedText>24 Hours After</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setScheduledExpiration(null)}>
+                                <ThemedText style={{ color: 'red' }}>Never Expire</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.modalBtn, { marginTop: 10, alignSelf: 'flex-end' }]}
+                            onPress={() => setIsScheduleExpirationVisible(false)}
+                        >
+                            <ThemedText>Cancel</ThemedText>
+                        </TouchableOpacity>
+                    </ThemedView>
+                </View>
+            </Modal>
+
+            {/* Edit Field Modal */}
+            <Modal
+                visible={!!editMode}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setEditMode(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <ThemedView style={styles.modalContent}>
+                        <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Edit {editMode?.label}</ThemedText>
+                        <TextInput
+                            style={[
+                                styles.modalInput,
+                                { color: theme.text, borderColor: theme.icon + '40' },
+                                editMode?.multiline && { height: 100, textAlignVertical: 'top', paddingTop: 10 }
+                            ]}
+                            value={tempValue}
+                            onChangeText={setTempValue}
+                            placeholder={`Enter your ${editMode?.label?.toLowerCase()}`}
+                            placeholderTextColor="#888"
+                            multiline={editMode?.multiline}
+                            autoFocus
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: theme.icon + '20' }]}
+                                onPress={() => setEditMode(null)}
+                            >
+                                <ThemedText>Cancel</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: theme.tint }]}
+                                onPress={handleUpdateField}
+                            >
+                                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Save</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                    </ThemedView>
+                </View>
+            </Modal>
         </ThemedView>
     );
 }
@@ -453,7 +943,6 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 20,
-        paddingTop: 60,
     },
     header: {
         alignItems: 'center',
@@ -496,8 +985,18 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     handle: {
-        fontSize: 16,
+        fontSize: 14,
         opacity: 0.6,
+    },
+    statusBadge: {
+        marginTop: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 15,
+    },
+    statusText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
     section: {
         marginBottom: 30,
@@ -608,6 +1107,15 @@ const styles = StyleSheet.create({
     modalBtn: {
         paddingVertical: 10,
         paddingHorizontal: 20,
+        borderRadius: 10,
+    },
+    presetList: {
+        gap: 10,
+    },
+    presetBtn: {
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
         borderRadius: 10,
     }
 });

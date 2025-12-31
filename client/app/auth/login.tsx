@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, TextInput, Alert, ActivityIndicator, View, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Link } from 'expo-router';
 import FirebaseRecaptchaVerifierModal, { FirebaseRecaptchaVerifier } from '@/components/FirebaseRecaptcha';
 
@@ -23,6 +24,7 @@ export default function LoginScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
+    const insets = useSafeAreaInsets();
 
     const recaptchaVerifier = React.useRef<FirebaseRecaptchaVerifier>(null);
 
@@ -35,6 +37,7 @@ export default function LoginScreen() {
         if (msg.includes('User not found') || msg.includes('404')) return null;
         if (msg.includes('user-disabled')) return 'This account has been disabled.';
         if (msg.includes('network-request-failed')) return 'Connection error. Check your internet.';
+        if (msg.includes('39') || msg.includes('auth/sms-quota-exceeded')) return 'Failed to send SMS, try again later or through a different phone number.';
         return msg;
     };
 
@@ -105,7 +108,7 @@ export default function LoginScreen() {
     };
 
     return (
-        <ThemedView style={styles.container}>
+        <ThemedView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1, justifyContent: 'center' }}

@@ -45,9 +45,16 @@ function RootLayoutNav() {
   );
 }
 
-import '@/utils/background-location';
+import { registerBackgroundFetchAsync, requestNotificationPermissions } from '@/utils/background-location';
 
 export default function RootLayout() {
+  useEffect(() => {
+    (async () => {
+      await requestNotificationPermissions();
+      await registerBackgroundFetchAsync();
+    })();
+  }, []);
+
   return (
     <AuthProvider>
       <RootLayoutNav />

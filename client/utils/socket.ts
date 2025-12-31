@@ -1,5 +1,5 @@
 import { getToken } from './storage';
-import { hashLocation } from './crypto';
+import { hashLocationAll } from './crypto';
 
 let ws: WebSocket | null = null;
 let reconnectInterval: NodeJS.Timeout | null = null;
@@ -120,8 +120,14 @@ export function sendSocketMessage(type: string, payload: any) {
 
 export const updateSocketLocation = (lat: number, lon: number) => {
     try {
-        const location_hash = hashLocation(lat, lon);
-        sendSocketMessage('location_update', { location_hash });
+        const hashes = hashLocationAll(lat, lon);
+        sendSocketMessage('location_update', {
+            location_hash_100m: hashes.location_hash_100m,
+            location_hash_500m: hashes.location_hash_500m,
+            location_hash_1km: hashes.location_hash_1km,
+            location_hash_3km: hashes.location_hash_3km,
+            location_hash_5km: hashes.location_hash_5km,
+        });
     } catch (e) {
         // Silent fail
     }

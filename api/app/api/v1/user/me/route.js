@@ -21,6 +21,27 @@ export async function GET(req) {
             return NextResponse.json({ error: 'User not found', code: 'not_found' }, { status: 404 });
         }
 
+        // Lazy Publish Scheduled Status
+        const now = new Date();
+        if (dbUser.scheduled_status && dbUser.scheduled_status_at && new Date(dbUser.scheduled_status_at) <= now) {
+            const { data: updated, error: updateErr } = await supabaseAdmin
+                .from('users')
+                .update({
+                    status: dbUser.scheduled_status,
+                    status_expiration: dbUser.scheduled_status_expiration,
+                    scheduled_status: null,
+                    scheduled_status_at: null,
+                    scheduled_status_expiration: null
+                })
+                .eq('id', dbUser.id)
+                .select('*')
+                .single();
+
+            if (!updateErr && updated) {
+                Object.assign(dbUser, updated);
+            }
+        }
+
         let emailVerified = false;
         if (dbUser.firebase_uid) {
             const admin = getFirebaseAdmin();
@@ -45,6 +66,15 @@ export async function GET(req) {
                 email_verified: emailVerified,
                 preferences: dbUser.preferences || { range: 5 },
                 created_at: dbUser.created_at,
+                bio: dbUser.bio,
+                website: dbUser.website,
+                business_type: dbUser.business_type,
+                public_phone: dbUser.public_phone,
+                status: (dbUser.status_expiration && new Date(dbUser.status_expiration) < new Date()) ? null : dbUser.status,
+                status_expiration: dbUser.status_expiration,
+                is_business: dbUser.is_business,
+                is_online: dbUser.is_online,
+                last_online: dbUser.last_online,
             }
         });
     } catch (err) {

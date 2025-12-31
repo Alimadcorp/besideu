@@ -13,24 +13,33 @@ export async function PUT(req) {
     }
 
     const body = await req.json();
-    const { location_hash, timestamp, meta } = body || {};
+    const { location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km, timestamp, meta } = body || {};
 
-    // Validate location_hash (SHA-256 hex string)
-    if (!location_hash || typeof location_hash !== 'string' || location_hash.length !== 64) {
-      return NextResponse.json(
-        { error: 'Invalid location hash', code: 'invalid_hash' },
-        { status: 400 },
-      );
+    // Validate all five location hashes (SHA-256 hex strings)
+    const hashes = { location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km };
+    for (const [key, hash] of Object.entries(hashes)) {
+      if (!hash || typeof hash !== 'string' || hash.length !== 64) {
+        return NextResponse.json(
+          { error: `Invalid ${key}`, code: 'invalid_hash' },
+          { status: 400 },
+        );
+      }
     }
 
-    // Upsert user location
+    const now = timestamp ? new Date(timestamp).toISOString() : new Date().toISOString();
+
+    // Upsert user location with all five hashes
     const { data, error } = await supabaseAdmin
       .from('user_locations')
       .upsert(
         {
           user_id: user.id,
-          location_hash,
-          updated_at: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
+          location_hash_100m,
+          location_hash_500m,
+          location_hash_1km,
+          location_hash_3km,
+          location_hash_5km,
+          updated_at: now,
         },
         { onConflict: 'user_id' },
       )
@@ -44,6 +53,12 @@ export async function PUT(req) {
         { status: 500 },
       );
     }
+
+    // Update user's last_online timestamp
+    await supabaseAdmin
+      .from('users')
+      .update({ last_online: now })
+      .eq('id', user.id);
 
     return NextResponse.json({
       success: true,

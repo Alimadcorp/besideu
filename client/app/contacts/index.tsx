@@ -55,46 +55,67 @@ export default function ContactsScreen() {
                     fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
                 });
 
+                // Group by contact name (not phone)
+                const contactsByName = new Map<string, ContactUser[]>();
+
                 data.forEach(c => {
-                    if (c.phoneNumbers) {
+                    const contactName = (c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim()).trim();
+                    if (!contactName) return;
+
+                    if (c.phoneNumbers && c.phoneNumbers.length > 0) {
+                        const phones: ContactUser[] = [];
+                        let hasOnApp = false;
+                        let hasFriend = false;
+                        let bestMatch: any = null;
+
                         c.phoneNumbers.forEach(p => {
                             const normalized = p.number || '';
                             const h = hashPhone(normalized);
-                            if (h && (c.name || c.firstName)) {
+                            if (h) {
                                 const match = matchMap.get(h);
-                                allDeviceContacts.push({
-                                    user_id: match?.user_id,
-                                    username: match?.username,
-                                    avatar_url: match?.avatar_url,
-                                    contact_name: c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
-                                    is_friend: match?.is_friend,
-                                    phone: normalized,
-                                    request_id: match?.request_id,
-                                    request_direction: match?.request_direction,
-                                    isOnApp: !!match
-                                });
+                                if (match) {
+                                    hasOnApp = true;
+                                    if (match.is_friend) hasFriend = true;
+                                    // Keep the best match (prefer friend)
+                                    if (!bestMatch || (match.is_friend && !bestMatch.is_friend)) {
+                                        bestMatch = match;
+                                    }
+                                }
                             }
                         });
+
+                        // Create one contact entry per name (show all contacts, not just on-app)
+                        contactsByName.set(contactName, [{
+                            user_id: bestMatch?.user_id,
+                            username: bestMatch?.username,
+                            avatar_url: bestMatch?.avatar_url,
+                            contact_name: contactName,
+                            is_friend: hasFriend,
+                            phone: c.phoneNumbers[0].number || '',
+                            request_id: bestMatch?.request_id,
+                            request_direction: bestMatch?.request_direction,
+                            isOnApp: hasOnApp
+                        }]);
                     }
                 });
+
+                // Convert map to array (already deduplicated by name)
+                const unique = Array.from(contactsByName.values()).flat();
+
+                // Sort: Friends first, then On App users, then alphabetical
+                unique.sort((a, b) => {
+                    // Priority 1: Friends
+                    if (a.is_friend !== b.is_friend) return a.is_friend ? -1 : 1;
+                    // Priority 2: Anyone on the app
+                    if (a.isOnApp !== b.isOnApp) return a.isOnApp ? -1 : 1;
+                    // Final: Alphabetical
+                    return a.contact_name.localeCompare(b.contact_name);
+                });
+
+                setContacts(unique);
+                setFilteredContacts(unique.slice(0, PAGE_SIZE));
+                setPage(1);
             }
-
-            // Deduplicate by phone
-            const unique = Array.from(new Map(allDeviceContacts.map(item => [item.phone, item])).values());
-
-            // Sort: Friends first, then On App users, then alphabetical
-            unique.sort((a, b) => {
-                // Priority 1: Friends
-                if (a.is_friend !== b.is_friend) return a.is_friend ? -1 : 1;
-                // Priority 2: Anyone on the app
-                if (a.isOnApp !== b.isOnApp) return a.isOnApp ? -1 : 1;
-                // Final: Alphabetical
-                return a.contact_name.localeCompare(b.contact_name);
-            });
-
-            setContacts(unique);
-            setFilteredContacts(unique.slice(0, PAGE_SIZE));
-            setPage(1);
         } catch (error) {
             console.error('Failed to fetch/map contacts:', error);
         } finally {

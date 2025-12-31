@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 if (!JWT_SECRET) {
   console.warn('[jwt] JWT_SECRET is not set. Tokens cannot be signed/verified.');

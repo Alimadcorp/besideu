@@ -111,6 +111,15 @@ app.ws('/', (ws, req) => {
 
   if (!textClients.has(userId)) {
     textClients.set(userId, new Set());
+    // Set user as online when first connection is established
+    const now = new Date().toISOString();
+    supabase
+      .from('users')
+      .update({ is_online: true, last_online: now })
+      .eq('id', userId)
+      .then(({ error }) => {
+        if (error) console.error('[Socket] Error setting user online', error);
+      });
   }
   textClients.get(userId).add(ws);
 
@@ -121,16 +130,29 @@ app.ws('/', (ws, req) => {
     try {
       const data = JSON.parse(msg);
       if (data.type === 'location_update' && data.payload) {
-        const { location_hash } = data.payload;
-        if (location_hash) {
+        const { location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km } = data.payload;
+        if (location_hash_100m && location_hash_500m && location_hash_1km && location_hash_3km && location_hash_5km) {
+          const now = new Date().toISOString();
           const { error } = await supabase
             .from('user_locations')
             .upsert({
               user_id: userId,
-              location_hash,
-              updated_at: new Date().toISOString()
+              location_hash_100m,
+              location_hash_500m,
+              location_hash_1km,
+              location_hash_3km,
+              location_hash_5km,
+              updated_at: now
             });
-          if (error) console.error('[Socket] DB ERROR: location_update', error);
+          if (error) {
+            console.error('[Socket] DB ERROR: location_update', error);
+          } else {
+            // Update user's last_online timestamp
+            await supabase
+              .from('users')
+              .update({ last_online: now })
+              .eq('id', userId);
+          }
         }
       }
     } catch (err) {
@@ -143,6 +165,15 @@ app.ws('/', (ws, req) => {
       textClients.get(userId).delete(ws);
       if (textClients.get(userId).size === 0) {
         textClients.delete(userId);
+        // Set user as offline when last connection is closed
+        const now = new Date().toISOString();
+        supabase
+          .from('users')
+          .update({ is_online: false, last_online: now })
+          .eq('id', userId)
+          .then(({ error }) => {
+            if (error) console.error('[Socket] Error setting user offline', error);
+          });
       }
     }
     console.log(`[Socket] DISCONNECTED: ${userId} (Code: ${code}, Reason: ${reason})`);

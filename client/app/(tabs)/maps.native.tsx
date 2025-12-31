@@ -1,8 +1,10 @@
 import { useRef, useCallback } from 'react';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Linking } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import { formatDistanceToNow } from 'date-fns';
 // import geohash from 'ngeohash'; // Removed
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -12,7 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiRequest } from '@/utils/api';
-import { hashLocation } from '@/utils/crypto';
+import { hashLocationAll } from '@/utils/crypto';
 import { useAuth } from '@/context/AuthContext';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
@@ -23,8 +25,10 @@ type NearbyUser = {
   username: string;
   real_name?: string;
   avatar_url?: string;
-  distance: string; // 'near' | 'far'
-  location_hash: string;
+  distance: string; // 'beside_you' | 'very_near' | 'near' | 'far' | 'very_far'
+  is_online?: boolean;
+  last_online?: string;
+  location_shared_at?: string;
 };
 
 export default function NearbyScreen() {
@@ -37,17 +41,22 @@ export default function NearbyScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const fetchNearbyUsers = useCallback(async () => {
     try {
       const location = await Location.getCurrentPositionAsync({});
-      const hash = hashLocation(location.coords.latitude, location.coords.longitude);
+      const hashes = hashLocationAll(location.coords.latitude, location.coords.longitude);
 
-      // Update our location first
+      // Update our location first with all five hashes
       await apiRequest('/v1/location/set', {
         method: 'PUT',
         body: JSON.stringify({
-          location_hash: hash,
+          location_hash_100m: hashes.location_hash_100m,
+          location_hash_500m: hashes.location_hash_500m,
+          location_hash_1km: hashes.location_hash_1km,
+          location_hash_3km: hashes.location_hash_3km,
+          location_hash_5km: hashes.location_hash_5km,
           timestamp: new Date().toISOString(),
         }),
       });
@@ -134,15 +143,24 @@ export default function NearbyScreen() {
           )}
         </View>
       </View>
-      <View style={styles.userInfo}>
+      <TouchableOpacity style={styles.userInfo} onPress={() => router.push(`/user/${item.id}` as any)}>
         <ThemedText type="defaultSemiBold" style={styles.username}>
           {item.real_name || item.username}
         </ThemedText>
-        {item.real_name && <ThemedText style={{ fontSize: 12, opacity: 0.6 }}>@{item.username}</ThemedText>}
+        {item.real_name && <ThemedText numberOfLines={1} style={{ fontSize: 12, opacity: 0.6 }}>@{item.username}</ThemedText>}
+        {item.location_shared_at && (
+          <ThemedText numberOfLines={1} style={{ fontSize: 11, opacity: 0.4, marginTop: 2 }}>
+            Updated {formatDistanceToNow(new Date(item.location_shared_at), { addSuffix: true })}
+          </ThemedText>
+        )}
         <ThemedText style={styles.distance}>
-          {item.distance === 'near' ? 'Near you' : 'Far away'}
+          {item.distance === 'beside_you' ? 'Beside you' :
+            item.distance === 'very_near' ? 'Very near' :
+              item.distance === 'near' ? 'Near you' :
+                item.distance === 'far' ? 'Far away' :
+                  'Very far'}
         </ThemedText>
-      </View>
+      </TouchableOpacity>
       <TouchableOpacity
         style={[styles.actionButton, { backgroundColor: theme.tint }]}
         onPress={() => {
@@ -159,7 +177,7 @@ export default function NearbyScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <ThemedText type="title">Nearby</ThemedText>
       </View>
 
@@ -194,7 +212,10 @@ export default function NearbyScreen() {
               </TouchableOpacity>
             </View>
           }
-          contentContainerStyle={nearbyUsers.length === 0 && styles.emptyList}
+          contentContainerStyle={[
+            nearbyUsers.length === 0 && styles.emptyList,
+            { paddingBottom: insets.bottom + 80 }
+          ]}
         />
       )}
     </ThemedView>
@@ -209,7 +230,6 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60,
     paddingBottom: 20,
   },
   userItem: {
