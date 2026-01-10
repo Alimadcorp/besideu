@@ -78,7 +78,10 @@ export async function GET(req, { params }) {
       const now = new Date().toISOString();
       let msgQuery = supabaseAdmin
         .from('messages')
-        .select('*')
+        .select(`
+            *,
+            meetup_request:meetups(*)
+        `)
         .eq('dm_id', chatId)
         .or(`scheduled_at.is.null,scheduled_at.lte.${now},sender_id.eq.${user.id}`)
         .order('timestamp', { ascending: true });

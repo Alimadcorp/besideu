@@ -32,6 +32,42 @@ export default function CreateMeetingScreen() {
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
 
+    // Invitee logic
+    const [friends, setFriends] = useState<any[]>([]);
+    const [selectedInvitees, setSelectedInvitees] = useState<Set<string>>(new Set());
+    const [showInviteModal, setShowInviteModal] = useState(false);
+
+    useEffect(() => {
+        fetchContactsAndFriends();
+    }, []);
+
+    const fetchContactsAndFriends = async () => {
+        try {
+            const [friendsData, contactsData] = await Promise.all([
+                apiRequest('/v1/friends/list'),
+                apiRequest('/v1/contacts/list')
+            ]);
+
+            const all = [
+                ...(friendsData.friends || []).map((f: any) => ({ ...f, type: 'friend', id: f.friend_id })),
+                ...(contactsData.matched || []).map((c: any) => ({ ...c, type: 'contact', id: c.user_id, real_name: c.contact_name || c.username }))
+            ];
+
+            // Deduplicate by ID
+            const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
+            setFriends(unique);
+        } catch (e) {
+            console.log('Failed to fetch invitees', e);
+        }
+    };
+
+    const toggleInvitee = (id: string) => {
+        const next = new Set(selectedInvitees);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedInvitees(next);
+    };
+
     const getCurrentLocation = async () => {
         setGettingLocation(true);
         try {
@@ -93,7 +129,8 @@ export default function CreateMeetingScreen() {
                     threshold_km: threshold,
                     starts_at: startDate.toISOString(),
                     ends_at: endDate.toISOString(),
-                    has_channel: hasChannel
+                    has_channel: hasChannel,
+                    invite_user_ids: Array.from(selectedInvitees)
                 })
             });
 
@@ -240,6 +277,22 @@ export default function CreateMeetingScreen() {
                     </TouchableOpacity>
                 </View>
 
+
+
+                <View style={styles.section}>
+                    <ThemedText style={styles.label}>Invite People</ThemedText>
+                    <TouchableOpacity
+                        style={[styles.input, { justifyContent: 'center', borderColor: theme.icon + '40' }]}
+                        onPress={() => setShowInviteModal(true)}
+                    >
+                        <ThemedText>
+                            {selectedInvitees.size === 0
+                                ? 'Select friends to invite...'
+                                : `${selectedInvitees.size} people selected`}
+                        </ThemedText>
+                    </TouchableOpacity>
+                </View>
+
                 <View style={[styles.section, styles.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
                     <View>
                         <ThemedText style={styles.label}>Create Group Chat</ThemedText>
@@ -268,7 +321,39 @@ export default function CreateMeetingScreen() {
 
             {renderDatePicker(showStartPicker, () => setShowStartPicker(false), startDate, setStartDate)}
             {renderDatePicker(showEndPicker, () => setShowEndPicker(false), endDate, setEndDate, startDate)}
-        </ThemedView>
+
+            <Modal visible={showInviteModal} transparent animationType="slide" onRequestClose={() => setShowInviteModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <ThemedView style={[styles.modalContent, { maxHeight: '80%' }]}>
+                        <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Invite Friends</ThemedText>
+                        <ScrollView style={{ width: '100%' }}>
+                            {friends.map((friend) => (
+                                <TouchableOpacity
+                                    key={friend.id}
+                                    style={[styles.inviteItem, selectedInvitees.has(friend.id) && { backgroundColor: theme.tint + '20' }]}
+                                    onPress={() => toggleInvitee(friend.id)}
+                                >
+                                    <View style={[styles.avatar, { backgroundColor: theme.tint }]}>
+                                        <ThemedText style={{ color: 'white' }}>{friend.username?.[0]?.toUpperCase()}</ThemedText>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <ThemedText type="defaultSemiBold">{friend.real_name || friend.username}</ThemedText>
+                                        <ThemedText style={{ fontSize: 12, opacity: 0.6 }}>@{friend.username}</ThemedText>
+                                    </View>
+                                    {selectedInvitees.has(friend.id) && <IconSymbol name="checkmark.circle.fill" size={24} color={theme.tint} />}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <TouchableOpacity
+                            style={[styles.btn, { marginTop: 20, backgroundColor: theme.tint, width: '100%' }]}
+                            onPress={() => setShowInviteModal(false)}
+                        >
+                            <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Done</ThemedText>
+                        </TouchableOpacity>
+                    </ThemedView>
+                </View>
+            </Modal>
+        </ThemedView >
     );
 }
 
@@ -350,6 +435,21 @@ const styles = StyleSheet.create({
         padding: 10,
         backgroundColor: 'rgba(150, 150, 150, 0.1)',
         borderRadius: 8,
+        alignItems: 'center',
+    },
+    inviteItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 8,
+        gap: 12,
+    },
+    avatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
         alignItems: 'center',
     }
 });

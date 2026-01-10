@@ -2,10 +2,13 @@ import { getToken } from './storage';
 import { hashLocationAll } from './crypto';
 
 let ws: WebSocket | null = null;
-let reconnectInterval: NodeJS.Timeout | null = null;
+let reconnectInterval: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
+const BASE_RECONNECT_DELAY = 1000; // Start with 1 second
 
 // Base WebSocket URL
-const WS_URL_BASE = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:2999';
+const WS_URL_BASE = process.env.EXPO_PUBLIC_WS_URL || 'wss://ws.besideu.alimad.co';
 
 type WebSocketMessage = {
     type: string;
@@ -16,21 +19,32 @@ type MessageHandler = (message: WebSocketMessage) => void;
 const listeners: MessageHandler[] = [];
 
 /**
- * Ensures the WebSocket URL is correctly formatted with a trailing slash and token
+ * Ensures the WebSocket URL is correctly formatted with token
  */
 function getFormattedUrl(token: string): string {
-    // Ensure the base URL ends with a slash if it doesn't have one and doesn't have a query
     let base = WS_URL_BASE;
-    if (!base.includes('?') && !base.endsWith('/')) {
-        base += '/';
+
+    // Remove trailing slash if present
+    if (base.endsWith('/')) {
+        base = base.slice(0, -1);
     }
 
+    // Add token as query parameter
     const separator = base.includes('?') ? '&' : '?';
     return `${base}${separator}token=${encodeURIComponent(token)}`;
 }
 
+/**
+ * Calculate exponential backoff delay
+ */
+function getReconnectDelay(): number {
+    const delay = Math.min(BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts), 30000);
+    return delay + Math.random() * 1000; // Add jitter
+}
+
 export async function connectWebSocket() {
     if (typeof WebSocket === 'undefined') {
+        console.log('[Socket] WebSocket not available in this environment');
         return;
     }
 
@@ -40,19 +54,20 @@ export async function connectWebSocket() {
 
     const token = await getToken();
     if (!token) {
-        // console.log('[Socket] No token, skipping connection');
+        console.log('[Socket] No token available');
         return;
     }
 
     try {
         const fullUrl = getFormattedUrl(token);
-        // console.log(`[Socket] Connecting to ${WS_URL_BASE}...`);
+        console.log('[Socket] Connecting...');
 
-        // Use a safe wrapper for WebSocket to handle potential handshake errors
         ws = new WebSocket(fullUrl);
 
         ws.onopen = () => {
-            // console.log('[Socket] Connected Successfully');
+            console.log('[Socket] Connected');
+            reconnectAttempts = 0; // Reset on successful connection
+
             if (reconnectInterval) {
                 clearInterval(reconnectInterval);
                 reconnectInterval = null;
@@ -62,41 +77,73 @@ export async function connectWebSocket() {
         ws.onmessage = (e) => {
             try {
                 const message = JSON.parse(e.data);
-                listeners.forEach(listener => listener(message));
+
+                // Handle ping/pong
+                if (message.type === 'ping') {
+                    sendSocketMessage('pong', {});
+                    return;
+                }
+
+                // Notify all listeners
+                listeners.forEach(listener => {
+                    try {
+                        listener(message);
+                    } catch (err) {
+                        console.error('[Socket] Listener error:', err);
+                    }
+                });
             } catch (err) {
-                // console.error('[Socket] Parse error:', err);
+                console.error('[Socket] Parse error:', err);
             }
         };
 
         ws.onclose = (e) => {
-            // console.log(`[Socket] Closed (Code: ${e.code}, Reason: ${e.reason || 'none'})`);
+            console.log(`[Socket] Closed (Code: ${e.code}, Reason: ${e.reason || 'none'})`);
             ws = null;
 
-            // Only reconnect if we didn't close manually and it's not an auth error (4001)
-            if (!reconnectInterval && e.code !== 4001) {
-                // console.log('[Socket] Scheduling reconnect...');
-                reconnectInterval = setInterval(connectWebSocket, 5000);
+            // Don't reconnect if it's an auth error (4001) or we've hit max attempts
+            if (e.code === 4001) {
+                console.log('[Socket] Authentication failed, not reconnecting');
+                return;
+            }
+
+            if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                console.log('[Socket] Max reconnection attempts reached');
+                return;
+            }
+
+            // Schedule reconnection with exponential backoff
+            if (!reconnectInterval) {
+                const delay = getReconnectDelay();
+                console.log(`[Socket] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+
+                reconnectInterval = setTimeout(() => {
+                    reconnectInterval = null;
+                    reconnectAttempts++;
+                    connectWebSocket();
+                }, delay);
             }
         };
 
         ws.onerror = (e) => {
-            // Silenced error
-            // console.error('[Socket] Connection error');
+            console.error('[Socket] Connection error');
         };
     } catch (err) {
-        // Silenced error
-        // console.error('[Socket] Setup error:', err);
+        console.error('[Socket] Setup error:', err);
     }
 }
 
 export function disconnectWebSocket() {
+    if (reconnectInterval) {
+        clearTimeout(reconnectInterval);
+        reconnectInterval = null;
+    }
+
+    reconnectAttempts = 0;
+
     if (ws) {
         ws.close(1000, 'User logged out');
         ws = null;
-    }
-    if (reconnectInterval) {
-        clearInterval(reconnectInterval);
-        reconnectInterval = null;
     }
 }
 
@@ -112,9 +159,13 @@ export function addSocketListener(callback: MessageHandler) {
 
 export function sendSocketMessage(type: string, payload: any) {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type, payload }));
+        try {
+            ws.send(JSON.stringify({ type, payload }));
+        } catch (err) {
+            console.error('[Socket] Send error:', err);
+        }
     } else {
-        // console.warn('[Socket] Message not sent: Not connected');
+        console.warn('[Socket] Message not sent: Not connected');
     }
 }
 
@@ -129,6 +180,27 @@ export const updateSocketLocation = (lat: number, lon: number) => {
             location_hash_5km: hashes.location_hash_5km,
         });
     } catch (e) {
-        // Silent fail
+        console.error('[Socket] Location update error:', e);
     }
 };
+
+/**
+ * Check if WebSocket is currently connected
+ */
+export function isSocketConnected(): boolean {
+    return ws !== null && ws.readyState === WebSocket.OPEN;
+}
+
+/**
+ * Get current connection state
+ */
+export function getSocketState(): string {
+    if (!ws) return 'CLOSED';
+    switch (ws.readyState) {
+        case WebSocket.CONNECTING: return 'CONNECTING';
+        case WebSocket.OPEN: return 'OPEN';
+        case WebSocket.CLOSING: return 'CLOSING';
+        case WebSocket.CLOSED: return 'CLOSED';
+        default: return 'UNKNOWN';
+    }
+}

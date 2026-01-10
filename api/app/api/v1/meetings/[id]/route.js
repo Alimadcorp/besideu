@@ -42,23 +42,23 @@ export async function GET(req, { params }) {
       invitation = inv;
     }
 
-    // Get attendees (accepted invitations)
+    // Get attendees (accepted invitations) with live status
     const { data: attendees } = await supabaseAdmin
       .from('meeting_invitations')
-      .select('invited_user_id, status, users(id, username, real_name, avatar_url)')
+      .select('invited_user_id, status, participation_status, current_lat, current_lon, last_seen_at, users(id, username, real_name, avatar_url)')
       .eq('meeting_id', id)
       .eq('status', 'accepted');
 
-    // Get arrivals if user is creator
-    let arrivals = [];
+    // Get logs if user is creator
+    let logs = [];
     if (isCreator) {
-      const { data: arr } = await supabaseAdmin
-        .from('meeting_arrivals')
-        .select('user_id, arrived_at, location, users(id, username, real_name, avatar_url)')
+      const { data: l } = await supabaseAdmin
+        .from('meeting_logs')
+        .select('user_id, type, created_at, location, users(id, username, real_name, avatar_url)')
         .eq('meeting_id', id)
-        .order('arrived_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
-      arrivals = arr || [];
+      logs = l || [];
     }
 
     return NextResponse.json({
@@ -71,8 +71,12 @@ export async function GET(req, { params }) {
           user_id: a.invited_user_id,
           user: a.users,
           status: a.status,
+          participation_status: a.participation_status,
+          current_lat: a.current_lat,
+          current_lon: a.current_lon,
+          last_seen_at: a.last_seen_at
         })),
-        arrivals: isCreator ? arrivals : undefined,
+        logs: isCreator ? logs : undefined,
       },
     });
   } catch (err) {

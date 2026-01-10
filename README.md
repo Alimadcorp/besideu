@@ -6,9 +6,9 @@
 
 **App tagline**: _Wo line maarne waale uncle zara bahir gaye hain_
 
-**TODO** Make this thing finished, as I don't have enough knowledge yet of all this.
+**Creator**: Habeebullah Arif Wattoo
 
-The main purpose of this app is to connect users physically. They must be location aware of each other. App will work similar to Facebook where you can add friends based on contacts. You can see which one of those friends are nearby (in an X kilometer radius, varying on their and other's preferences), you can chat with those friends. You can send meetup requests to those friends to make them send their exact location.
+The main purpose of this app is to connect users physically. They must be location aware of each other. App works similar to Facebook where you can add friends based on contacts. You can see which one of those friends are nearby (in an X kilometer radius, varying on their and other's preferences), you can chat with those friends. You can send meetup requests to those friends to make them send their exact location. Business accounts can create meetings with real-time attendance tracking.
 
 ---
 
@@ -19,6 +19,7 @@ The main purpose of this app is to connect users physically. They must be locati
   - [Technologies](#technologies)
   - [Deployment](#deployment)
   - [Layout](#layout)
+  - [Features](#features)
 - [Backend](#backend)
   - [Technologies](#technologies-1)
   - [Deployment](#deployment-1)
@@ -40,31 +41,94 @@ The main purpose of this app is to connect users physically. They must be locati
 
 `socket`: Contains Express backend (https://ws.besideu.alimad.co)
 
+`database`: Contains SQL migration files for Supabase
+
 ---
 
 ## Frontend
 
 ### Technologies:
   - Expo.dev (React Native)
+  - React Native Maps (for meeting location tracking)
+  - Expo Location (for geolocation)
+  - Firebase (for phone authentication)
 
 ### Deployment:
   - Will be released as Android-only app on Google Play Store
 
 ### Layout:
 
-There will be two main pages: `chats` and `map`
+The app has a tab-based navigation with the following main screens:
 
-Then there will be the `chat` layout which of course will be a chatting client. You can send and receive messages. The user will poll new messages based on `last_fetched_timestamp`. The user will be updated about new messages through WebSocket. The user will fetch the new messages through the API still.
+#### Main Tabs:
+1. **Chats** (`(tabs)/index.tsx`) - List of all DM conversations
+2. **Map** (`(tabs)/maps.tsx`) - Shows nearby friends based on location
+3. **Status** (`(tabs)/status.tsx`) - View and post Instagram-style stories
+4. **Profile** (`(tabs)/profile.tsx`) - User profile and settings
 
-The app will run a WebSocket connection always in the background, updating the user's current location to the backend, and awaiting any new message notifications.
+#### Additional Screens:
+- **Intro** (`intro.tsx`) - First-time user onboarding (shown once)
+- **Auth** (`auth/`) - Login and signup flows
+- **Chats** (`chats/[id].tsx`) - Individual chat conversation
+- **Meetings** (`meetings/`) - Create and view meetings (business accounts)
+- **Friends** (`friends/`) - Manage friends and friend requests
+- **Contacts** (`contacts/`) - Sync and invite from phone contacts
+- **User Profile** (`user/[id].tsx`) - View other users' profiles
+- **Status** (`status/`) - Create and view user statuses
 
-**Chats**
+### Features:
 
-It will have chats list, user can open any one chat and send or receive messages. User can send a `meetup` request in order to ask the other user for their exact location for a meetup.
+#### 1. **Location-Based Friend Discovery**
+- Privacy-preserving location hashing (Geohash)
+- See friends within customizable radius (1-50km)
+- Real-time location updates via WebSocket
+- Distance shown as "near" or "far" for privacy
 
-**Map**
+#### 2. **Chat System**
+- Direct messaging with friends
+- Message reactions
+- Image sharing
+- Meetup requests (1-to-1 location sharing)
+- Read receipts and unread counts
+- Chat hiding and blocking
+- Self-messaging (notes to self)
 
-It will not show a map, it will show a list of the nearby users. User can only see his distance from them, based on Geohash.
+#### 3. **User Statuses**
+- Instagram-style stories
+- Text, image, and video statuses
+- 24-hour expiration
+- Scheduled status posting
+- View tracking
+- Custom backgrounds and fonts
+
+#### 4. **Meeting System** (Business Accounts Only)
+- Create meetings with location and time
+- Invite multiple friends/contacts
+- Real-time attendance tracking
+- Live map view showing all attendees
+- Automatic entry/exit logging
+- Historical attendance logs
+- Group chat for meeting participants
+- Active window: 3 hours before to 3 hours after meeting
+
+#### 5. **Friend Management**
+- Add friends from contacts
+- Send/accept/decline friend requests
+- Remove friends
+- Privacy-preserving contact matching (hashed phone numbers)
+
+#### 6. **User Profiles**
+- Personal and business profiles
+- Custom bio, website, status
+- Scheduled status updates
+- Avatar upload
+- Email verification
+- Customizable discovery radius
+
+#### 7. **Intro Screen**
+- First-time user onboarding
+- Explains key features: nearby, chats, meetups
+- Only shown once per device
 
 ---
 
@@ -74,6 +138,8 @@ It will not show a map, it will show a list of the nearby users. User can only s
   - NextJS as backend API
   - Supabase as storage and operations
   - One separate Express app for WebSocket
+  - Firebase Admin SDK for authentication
+  - ImgBB for image hosting
 
 ### Deployment:
   - NextJS app must be deployable on Vercel (Operations must be optimized to run within at most 5 seconds)
@@ -81,16 +147,16 @@ It will not show a map, it will show a list of the nearby users. User can only s
 
 ### NextJS App API
 
-This app will work on the app router, and will expose many API methods to allow users to perform operations. We will store only a custom privacy-preserving hash of the location of all the users in the server, and use that to find neighboring users. We can use the exact location only when a `meetup` is requested.
+This app works on the app router, and exposes many API methods to allow users to perform operations. We store only a custom privacy-preserving hash of the location of all the users in the server, and use that to find neighboring users. We can use the exact location only when a `meetup` is requested.
 
 **Base URL**: `https://api.besideu.alimad.co`
 
 #### Authentication Endpoints (`/auth`)
 
-The app will authenticate users based on phone number only. Later on you can link your Email to your account (by email verification).
+The app authenticates users based on phone number only. Later on you can link your Email to your account (by email verification).
 
 - **POST** `/auth/signup`
-
+  
   Register a new user account. Client authenticates with Firebase phone auth first, then sends Firebase ID token to this endpoint.
   
   **Body**: 
@@ -98,7 +164,8 @@ The app will authenticate users based on phone number only. Later on you can lin
   {
     "firebase_token": "string",
     "username": "string",
-    "real_name": "string"
+    "real_name": "string",
+    "email": "string (optional)"
   }
   ```
   
@@ -114,18 +181,10 @@ The app will authenticate users based on phone number only. Later on you can lin
     }
   }
   ```
-  
-  **Error Response**:
-  ```json
-  {
-    "error": "string",
-    "code": "string"
-  }
-  ```
 
 - **POST** `/auth/login`
-
-  Login with Firebase phone authentication. Client authenticates with Firebase first, then sends Firebase ID token to this endpoint.
+  
+  Login with Firebase phone authentication.
   
   **Body**: 
   ```json
@@ -146,35 +205,16 @@ The app will authenticate users based on phone number only. Later on you can lin
     }
   }
   ```
-  
-  **Error Response**:
-  ```json
-  {
-    "error": "string",
-    "code": "string"
-  }
-  ```
 
 #### Protected Endpoints (`/v1`)
 
-The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT token is issued by the API after verifying the Firebase ID token. The current_user will be resolved by reading their verified token. Each of these requests must have `Authorization: Bearer <token>` in their headers.
-
-**JWT Token Format**: Standard JWT with user ID and phone number in payload. Expires after 24 hours. This token is separate from Firebase tokens and is used for API authentication.
-
-**Error Response Format**:
-```json
-{
-  "error": "string",
-  "code": "string",
-  "status": 400
-}
-```
+The entire `/v1` route is secured by JWT Bearer Authentication. Each request must have `Authorization: Bearer <token>` in headers.
 
 ##### Location Endpoints
 
 - **PUT** `/v1/location/set`
-
-  Set your location (store the user's location hash only in the server).
+  
+  Set your location (stores location hash only).
   
   **Body**: 
   ```json
@@ -187,340 +227,102 @@ The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT tok
     }
   }
   ```
-  
-  **Response**: 
-  ```json
-  {
-    "success": true,
-    "updated_at": "ISO8601_string"
-  }
-  ```
 
 - **GET** `/v1/location/find`
-
-  Get other users in your `range` (kilometers) based on location hash proximity.
+  
+  Get other users in your range based on location hash proximity.
   
   **Query Parameters**: 
-  - `range?` (number, in kilometers) - If none provided, defaults to `current_user.preference.range`
-  - `filter?` (string, optional) - Filter by friend status or other criteria
-  
-  **Response**: 
-  ```json
-  {
-    "users": [
-      {
-        "id": "string",
-        "username": "string",
-        "distance": "near|far",
-        "location_hash": "string"
-      }
-    ]
-  }
-  ```
-
-**Location Hash**: A custom hash generated from the location. It is a one-way hash that cannot be decrypted back into coordinates, but allows determining if users are in the same region.
+  - `range?` (number, in kilometers)
+  - `filter?` (string, optional)
 
 ##### Friends Endpoints
 
-- **POST** `/v1/friends/add`
-
-  Send a friend request to a contact or user.
-  
-  **Query Parameters**: 
-  - `user` (string, required) - User ID to send request to
-  - `isContact?` (boolean, optional) - Whether this is from contacts list
-  
-  **Response**: 
-  ```json
-  {
-    "success": true,
-    "request_id": "string"
-  }
-  ```
-
-- **GET** `/v1/friends/requests`
-
-  List all pending friend requests (incoming and outgoing).
-  
-  **Response**: 
-  ```json
-  {
-    "incoming": [
-      {
-        "id": "string",
-        "user_id": "string",
-        "username": "string",
-        "created_at": "ISO8601_string"
-      }
-    ],
-    "outgoing": [
-      {
-        "id": "string",
-        "user_id": "string",
-        "username": "string",
-        "created_at": "ISO8601_string"
-      }
-    ]
-  }
-  ```
-
-- **POST** `/v1/friends/accept`
-
-  Accept a pending friend request.
-  
-  **Query Parameters**: 
-  - `id` (string, required) - Friend request ID
-  
-  **Response**: 
-  ```json
-  {
-    "success": true,
-    "friendship_id": "string"
-  }
-  ```
-
-- **DELETE** `/v1/friends/remove`
-
-  Remove a friend or cancel a pending friend request.
-  
-  **Query Parameters**: 
-  - `id?` (string, optional) - Friend request or friendship ID
-  - `user?` (string, optional) - User ID to remove
-  
-  **Response**: 
-  ```json
-  {
-    "success": true
-  }
-  ```
+- **POST** `/v1/friends/add` - Send friend request
+- **GET** `/v1/friends/requests` - List pending requests
+- **GET** `/v1/friends/list` - List all friends
+- **POST** `/v1/friends/accept` - Accept friend request
+- **DELETE** `/v1/friends/remove` - Remove friend
 
 ##### Contacts Endpoints
 
-- **PUT** `/v1/contacts/set`
-
-  Upload the user's contacts list.
-  
-  **Body**: 
-  ```json
-  {
-    "contacts": [
-      {
-        "name": "string",
-        "phone_hash": ["string"]
-      }
-    ],
-    "length": "number",
-    "timestamp": "ISO8601_string"
-  }
-  ```
-  
-  **Response**: 
-  ```json
-  {
-    "success": true,
-    "matched_users": ["user_id"]
-  }
-  ```
-
-- **GET** `/v1/contacts/list`
-
-  Check the user's contact list to see which of them are also using this app. The user can send them requests.
-  
-  **Query Parameters**: 
-  - `user?` (string, optional) - Check a specific user
-  - `phone?` (string, optional) - Check a specific phone number
-  
-  **Response**: 
-  ```json
-  {
-    "matched": [
-      {
-        "user_id": "string",
-        "username": "string",
-        "phone": "string",
-        "contact_name": "string",
-        "is_friend": "boolean"
-      }
-    ]
-  }
-  ```
-
-**Contact Matching**: Phone numbers are normalized in the format `+Code'nPhone` (e.g. `+24123912319`) and then hashed before uploading. The server receives and compares these hashes. Privacy settings may hide some users from contact matching.
+- **PUT** `/v1/contacts/set` - Upload contacts (hashed phone numbers)
+- **GET** `/v1/contacts/list` - Check which contacts use the app
 
 ##### Messages Endpoints
 
-- **GET** `/v1/messages/list`
+- **GET** `/v1/messages/list` - Get DM list with unread counts
+- **GET** `/v1/messages/:id/get` - Get messages in a DM
+- **POST** `/v1/messages/:id/send` - Send a message
+- **POST** `/v1/messages/:id/meetup` - Send meetup location
+- **POST** `/v1/messages/:id/react` - React to a message
+- **POST** `/v1/messages/:id/read` - Mark messages as read
+- **POST** `/v1/messages/:id/hide` - Hide a chat
 
-  Get the user's DM list (this will include new notifications count for each DM).
-  
-  **Query Parameters**: 
-  - `after?` (ISO8601 timestamp or message_id, optional) - Only return DMs updated after this timestamp
-  
-  **Response**: 
+##### Status Endpoints
+
+- **POST** `/v1/status` - Create a new status
+- **GET** `/v1/status/me` - Get your statuses
+- **GET** `/v1/status/feed` - Get friends' statuses
+- **POST** `/v1/status/:id/view` - Mark status as viewed
+
+##### Meeting Endpoints (Business Accounts Only)
+
+- **POST** `/v1/meetings/create` - Create a meeting
   ```json
   {
-    "dms": [
-      {
-        "id": "string",
-        "user_id": "string",
-        "username": "string",
-        "last_message": {
-          "text": "string",
-          "timestamp": "ISO8601_string"
-        },
-        "unread_count": "number",
-        "updated_at": "ISO8601_string"
-      }
-    ]
+    "title": "string",
+    "description": "string",
+    "location": {"lat": number, "lon": number, "name": "string"},
+    "threshold_km": number,
+    "starts_at": "ISO8601_string",
+    "ends_at": "ISO8601_string",
+    "has_channel": boolean,
+    "invite_user_ids": ["user_id"]
   }
   ```
 
-- **GET** `/v1/messages/:id/get`
-
-  Get a specific DM. Will only show messages after `after` parameter. User devices are expected to have a local copy of previous messages, but they can reload from server when needed. Messages cannot be deleted. Reactions are stored separately with timestamps, and reactions happening after `after` will be listed. Each message has a unique message ID.
-  
-  **Query Parameters**: 
-  - `after?` (ISO8601 timestamp or message_id, optional) - Only return messages/reactions after this timestamp
-  
-  **Response**: 
-  ```json
-  {
-    "dm_id": "string",
-    "user": {
-      "id": "string",
-      "username": "string"
-    },
-    "messages": [
-      {
-        "id": "string",
-        "text": "string",
-        "sender_id": "string",
-        "timestamp": "ISO8601_string",
-        "meetup_request": {
-          "id": "string",
-          "status": "pending|accepted|declined",
-          "location": null
-        }
-      }
-    ],
-    "reactions": [
-      {
-        "message_id": "string",
-        "reaction": "string",
-        "user_id": "string",
-        "timestamp": "ISO8601_string"
-      }
-    ]
-  }
-  ```
-
-**Message ID Format**: UUID v4 or timestamp-based unique identifier.
-
-**Polling vs WebSocket**: The app uses WebSocket for real-time notifications (new message, friend request, etc.). When a notification is received via WebSocket, the client should fetch the actual data from the API. The client polls the API periodically using the `after` parameter based on `last_fetched_timestamp` stored locally.
-
-- **POST** `/v1/messages/:id/send`
-
-  Send a message in a DM. Rate limited to 1 message per second per user.
-  
-  **Body**: 
-  ```json
-  {
-    "text": "string (max 2000 chars)",
-    "timestamp": "ISO8601_string",
-    "meetup": "boolean (optional)",
-    "meta": {
-      "reply_to": "message_id (optional)"
-    }
-  }
-  ```
-  
-  **Response**: 
-  ```json
-  {
-    "success": true,
-    "message_id": "string",
-    "timestamp": "ISO8601_string"
-  }
-  ```
-
-- **POST** `/v1/messages/:id/meetup`
-
-  Send meetup location (to accept the meetup request).
-  
-  **Body**: 
-  ```json
-  {
-    "location": {
-      "long": "number",
-      "lat": "number",
-      "alt": "number (optional)"
-    },
-    "timestamp": "ISO8601_string",
-    "meta": {
-      "meetup_request_id": "string"
-    }
-  }
-  ```
-  
-  **Response**: 
-  ```json
-  {
-    "success": true,
-    "meetup_id": "string"
-  }
-  ```
-
-##### Media Endpoints
-
-- **POST** `/v1/image/upload`
-
-  Upload an image (on backend it will transfer the image to ImgBB).
-  
-  **Query Parameters**: 
-  - `expire?` (number, optional) - Expiration time in seconds
-  
-  **Body**: 
-  - Multipart form data with `image` field
-  
-  **Response**: 
-  ```json
-  {
-    "url": "string",
-    "expires_at": "ISO8601_string (if applicable)"
-  }
-  ```
-
-**Image Limits**: Max file size 10MB. Supported formats: JPEG, PNG, WebP.
+- **GET** `/v1/meetings/list` - List your meetings
+- **GET** `/v1/meetings/:id` - Get meeting details (includes live locations and logs for creator)
+- **POST** `/v1/meetings/:id/respond` - Accept/decline invitation
+- **POST** `/v1/meetings/:id/check-arrival` - Check in at meeting (auto-called by app)
+- **POST** `/v1/meetings/:id/invite` - Invite additional users
+- **GET** `/v1/meetings/:id/channel/messages` - Get meeting chat messages
 
 ##### User Endpoints
 
-- **POST** `/v1/logout`
+- **GET** `/v1/user/me` - Get current user profile
+- **PUT** `/v1/user/settings` - Update user settings
+- **GET** `/v1/user/:id/profile` - Get another user's profile
+- **POST** `/v1/user/resend-verification` - Resend email verification
+- **POST** `/v1/user/block` - Block/unblock a user
+- **POST** `/v1/user/create-self-chat` - Create self-messaging chat
+- **GET** `/v1/user/lookup` - Look up user by username
 
-  Logout and invalidate the current session.
-  
-  **Query Parameters**: 
-  - `reason?` (string, optional) - Logout reason for analytics
-  
-  **Response**: 
-  ```json
-  {
-    "success": true
-  }
-  ```
+##### Media Endpoints
+
+- **POST** `/v1/image/upload` - Upload image to ImgBB
+
+##### Other Endpoints
+
+- **POST** `/v1/logout` - Logout and invalidate session
+
+##### Cron Endpoints (Internal)
+
+- **POST** `/v1/cron/scheduled-status` - Process scheduled statuses
+- **POST** `/v1/cron/scheduled-messages` - Process scheduled messages
 
 ### Express WebSocket App
 
-**Purpose**: To expose a WebSocket to inform users of any changes made to the store. The user will not be able to read these changes through the WebSocket, they'll have to refetch from the main API.
+**Purpose**: Real-time updates for location, messages, friend requests, and meeting events.
 
 **Deployment**: `wss://ws.besideu.alimad.co`
 
-**Connection**: The user must send an initial HTTP request with `Authorization: Bearer <token>` header to authenticate. Upon successful authentication, the connection will be upgraded to WebSocket. This way we have context on which user is connected.
+**Connection**: Authenticate with `Authorization: Bearer <token>` header, then upgrade to WebSocket.
 
-**Implementation**: This app can either directly await updates to Supabase using real-time subscriptions, or have a webhook integration with the NextJS backend.
+#### WebSocket Message Types:
 
-#### WebSocket Message Format
-
-**Incoming Messages (Client → Server)**:
+**Client → Server**:
 ```json
 {
   "type": "location_update",
@@ -531,126 +333,192 @@ The entire `/v1` route will be secured by JWT Bearer Authentication. The JWT tok
 }
 ```
 
-**Outgoing Messages (Server → Client)**:
-```json
-{
-  "type": "new_message",
-  "payload": {
-    "dm_id": "string",
-    "message_id": "string"
-  }
-}
-```
-
-**Message Types**:
-- `location_update` - Client sends location updates
-- `new_message` - Server notifies of new message
-- `friend_request` - Server notifies of new friend request
-- `friend_accepted` - Server notifies of accepted friend request
-- `meetup_request` - Server notifies of meetup request
-- `meetup_accepted` - Server notifies of accepted meetup with location
-- `ping` / `pong` - Keep-alive messages
+**Server → Client**:
+- `new_message` - New DM received
+- `friend_request` - New friend request
+- `friend_accepted` - Friend request accepted
+- `meetup_request` - Meetup request received
+- `meetup_accepted` - Meetup accepted with location
+- `meeting_update` - Meeting status changed
+- `status_posted` - Friend posted new status
+- `ping` / `pong` - Keep-alive
 
 ---
 
 ## Database Schema
 
-The following tables will be created in Supabase:
+The following tables exist in Supabase:
 
-### `users`
+### Core Tables
+
+#### `users`
 - `id` (UUID, primary key)
 - `phone` (string, unique, indexed)
 - `username` (string, unique)
 - `real_name` (string)
-- `firebase_uid` (string, unique, indexed) - Firebase user ID
+- `firebase_uid` (string, unique)
 - `email` (string, nullable)
-- `email_verified` (boolean, default false)
-- `preferences` (JSONB) - Contains `range` (default 5km) and other settings
-- `created_at` (timestamp)
+- `email_verified` (boolean)
+- `avatar_url` (string)
+- `bio` (text)
+- `website` (string)
+- `status` (string) - Current user status
+- `status_expiration` (timestamp)
+- `scheduled_status` (string)
+- `scheduled_status_at` (timestamp)
+- `scheduled_status_expiration` (timestamp)
+- `is_business` (boolean)
+- `business_type` (string)
+- `public_phone` (string)
+- `preferences` (JSONB) - Contains `range`, `share_location`, etc.
+- `expo_push_token` (string)
+- `created_at`, `updated_at` (timestamps)
+
+#### `user_locations`
+- `id` (UUID)
+- `user_id` (UUID, foreign key)
+- `location_hash` (string, indexed) - Privacy-preserving geohash
 - `updated_at` (timestamp)
 
-### `user_locations`
-- `id` (UUID, primary key)
-- `user_id` (UUID, foreign key to users)
-- `location_hash` (string, indexed)
-- `updated_at` (timestamp, indexed)
-
-### `friends`
-- `id` (UUID, primary key)
-- `user_id_1` (UUID, foreign key to users)
-- `user_id_2` (UUID, foreign key to users)
+#### `friends`
+- `id` (UUID)
+- `user_id_1`, `user_id_2` (UUIDs, ordered: user_id_1 < user_id_2)
+- `last_message` (string)
+- `last_message_at` (timestamp)
+- `last_read_at_1`, `last_read_at_2` (timestamps)
+- `unread_count_1`, `unread_count_2` (integers)
+- `hidden_by_1`, `hidden_by_2` (booleans)
 - `created_at` (timestamp)
-- `last_message` (string, nullable) - Denormalized last message text
-- `last_message_at` (timestamp, nullable, indexed) - Time of last message
-- `last_read_at_1` (timestamp, nullable) - When user_id_1 last read the chat
-- `last_read_at_2` (timestamp, nullable) - When user_id_2 last read the chat
-- `unread_count_1` (integer, default 0) - Unread messages for user_id_1
-- `unread_count_2` (integer, default 0) - Unread messages for user_id_2
-- Check constraint: `user_id_1 < user_id_2` (ensures consistent ordering)
-- Unique constraint on (user_id_1, user_id_2)
-- **Note**: `user_id_1` must always be the smaller UUID to prevent duplicate bidirectional friendships. Application logic must ensure this ordering when creating friendships.
 
-### `friend_requests`
-- `id` (UUID, primary key)
-- `from_user_id` (UUID, foreign key to users)
-- `to_user_id` (UUID, foreign key to users)
+#### `friend_requests`
+- `id` (UUID)
+- `from_user_id`, `to_user_id` (UUIDs)
 - `status` (enum: pending, accepted, declined, cancelled)
 - `created_at` (timestamp)
-- Unique constraint on (from_user_id, to_user_id) where status = 'pending' (prevents duplicate pending requests)
 
-### `contacts`
-- `id` (UUID, primary key)
-- `user_id` (UUID, foreign key to users)
-- `contacts_data` (JSONB) - Array of {name, phone[]}
+#### `contacts`
+- `id` (UUID)
+- `user_id` (UUID)
+- `contacts_data` (JSONB) - Array of {name, phone_hashes[]}
 - `last_synced_at` (timestamp)
 
-### `messages`
-- `id` (UUID, primary key)
-- `dm_id` (UUID, indexed) - Direct message conversation ID
-- `sender_id` (UUID, foreign key to users)
+#### `messages`
+- `id` (UUID)
+- `dm_id` (UUID, indexed)
+- `sender_id` (UUID)
 - `text` (string, max 2000 chars)
-- `timestamp` (timestamp, indexed)
-- `meetup_request_id` (UUID, nullable, foreign key to meetups)
+- `image_url` (string)
+- `timestamp` (timestamp)
+- `meetup_request_id` (UUID, nullable)
 
-### `message_reactions`
-- `id` (UUID, primary key)
-- `message_id` (UUID, foreign key to messages)
-- `user_id` (UUID, foreign key to users)
-- `reaction` (string) - emoji or reaction type
+#### `message_reactions`
+- `id` (UUID)
+- `message_id` (UUID)
+- `user_id` (UUID)
+- `reaction` (string) - emoji
 - `timestamp` (timestamp)
 
-### `meetups`
-- `id` (UUID, primary key)
-- `dm_id` (UUID, foreign key)
-- `requested_by` (UUID, foreign key to users)
-- `requested_from` (UUID, foreign key to users)
+#### `meetups`
+- `id` (UUID)
+- `dm_id` (UUID)
+- `requested_by`, `requested_from` (UUIDs)
 - `status` (enum: pending, accepted, declined, expired)
 - `location` (JSONB) - {long, lat, alt}
 - `expires_at` (timestamp)
 - `created_at` (timestamp)
 
+#### `user_blocks`
+- `blocker_id`, `blocked_id` (UUIDs)
+- `created_at` (timestamp)
+
+### Status Tables
+
+#### `user_statuses`
+- `id` (UUID)
+- `user_id` (UUID)
+- `type` (enum: text, image, video)
+- `content` (text) - Caption
+- `media_url` (string)
+- `background_color` (string)
+- `font_style` (string)
+- `scheduled_at` (timestamp)
+- `expires_at` (timestamp)
+- `created_at` (timestamp)
+
+#### `status_views`
+- `status_id`, `viewer_id` (UUIDs)
+- `viewed_at` (timestamp)
+
+### Meeting Tables
+
+#### `meetings`
+- `id` (UUID)
+- `creator_id` (UUID)
+- `title` (string)
+- `description` (text)
+- `location` (JSONB) - {lat, lon, name, address}
+- `threshold_km` (numeric) - Distance threshold for arrival
+- `starts_at`, `ends_at` (timestamps)
+- `has_channel` (boolean)
+- `channel_id` (UUID)
+- `created_at`, `updated_at` (timestamps)
+
+#### `meeting_invitations`
+- `id` (UUID)
+- `meeting_id` (UUID)
+- `invited_user_id` (UUID)
+- `status` (enum: pending, accepted, declined)
+- `current_lat`, `current_lon` (numeric) - Live tracking
+- `last_seen_at` (timestamp)
+- `participation_status` (enum: arrived, transit, NULL)
+- `invited_at`, `responded_at` (timestamps)
+
+#### `meeting_logs`
+- `id` (UUID)
+- `meeting_id`, `user_id` (UUIDs)
+- `type` (enum: entered, exited)
+- `location` (JSONB)
+- `distance_km` (numeric)
+- `created_at` (timestamp)
+
+#### `meeting_channels`
+- `id` (UUID)
+- `meeting_id` (UUID, unique)
+- `created_at`, `updated_at` (timestamps)
+
+#### `meeting_channel_members`
+- `id` (UUID)
+- `channel_id`, `user_id` (UUIDs)
+- `joined_at` (timestamp)
+
+#### `meeting_channel_messages`
+- `id` (UUID)
+- `channel_id`, `sender_id` (UUIDs)
+- `text` (string)
+- `image_url` (string)
+- `timestamp`, `created_at` (timestamps)
+
 ### Row Level Security (RLS)
-All tables will have RLS policies to ensure users can only access their own data and data they're authorized to see (friends, messages, etc.).
+All tables have RLS policies to ensure users can only access their own data and data they're authorized to see (friends, messages, etc.).
 
 ### Indexes
-- `user_locations.location_hash` - For efficient hash-based queries
-- `user_locations.updated_at` - For finding recently active users
-- `messages.dm_id, timestamp` - Composite index for message retrieval
-- `messages.sender_id, timestamp` - Composite index for rate limiting
-- `friends.user_id_1, user_id_2` - For friend lookup
+- Location hashes for efficient proximity queries
+- Message timestamps for pagination
+- User IDs for relationship lookups
+- Meeting logs for attendance tracking
 
 ---
 
 ## Environment Variables
 
-### NextJS API (`api/` or `web/app/api/`)
+### NextJS API (`api/`)
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_ANON_KEY` - Supabase anonymous key
-- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin operations)
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
 - `JWT_SECRET` - Secret key for JWT token signing
 - `JWT_EXPIRES_IN` - JWT expiration time (default: 24h)
 - `FIREBASE_PROJECT_ID` - Firebase project ID
-- `FIREBASE_CLIENT_EMAIL` - Firebase service account client email
+- `FIREBASE_CLIENT_EMAIL` - Firebase service account email
 - `FIREBASE_PRIVATE_KEY` - Firebase service account private key
 - `IMGBB_API_KEY` - ImgBB API key for image uploads
 - `NODE_ENV` - Environment (development/production)
@@ -663,8 +531,8 @@ All tables will have RLS policies to ensure users can only access their own data
 - `NODE_ENV` - Environment (development/production)
 
 ### Frontend Client (`client/`)
-- `EXPO_PUBLIC_API_URL` - API base URL (https://api.besideu.alimad.co)
-- `EXPO_PUBLIC_WS_URL` - WebSocket URL ([wss://ws.besideu.alimad.co](wss://ws.besideu.alimad.co))
+- `EXPO_PUBLIC_API_URL` - API base URL
+- `EXPO_PUBLIC_WS_URL` - WebSocket URL
 - `EXPO_PUBLIC_FIREBASE_API_KEY` - Firebase web API key
 - `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` - Firebase auth domain
 - `EXPO_PUBLIC_FIREBASE_PROJECT_ID` - Firebase project ID
@@ -674,36 +542,45 @@ All tables will have RLS policies to ensure users can only access their own data
 ## Authentication Flow
 
 1. **Signup**: 
-   - Client uses Firebase phone authentication to verify phone number
-   - Firebase sends SMS verification code to user's phone
-   - User enters verification code in Firebase SDK
-   - Client receives Firebase ID token after successful verification
-   - Client sends Firebase ID token to `/auth/signup` with username and real_name
-   - Backend verifies Firebase ID token using Firebase Admin SDK
-   - Backend extracts phone number from Firebase token
-   - Backend creates user account in Supabase
-   - Backend generates and returns JWT token for API authentication
-   - User is now authenticated
+   - Client uses Firebase phone authentication
+   - Firebase sends SMS verification code
+   - User enters code in Firebase SDK
+   - Client receives Firebase ID token
+   - Client sends token to `/auth/signup` with username and real_name
+   - Backend verifies token using Firebase Admin SDK
+   - Backend creates user in Supabase
+   - Backend generates and returns JWT token
 
 2. **Login**: 
-   - Client uses Firebase phone authentication to verify phone number
-   - Firebase sends SMS verification code to user's phone
-   - User enters verification code in Firebase SDK
-   - Client receives Firebase ID token after successful verification
-   - Client sends Firebase ID token to `/auth/login`
-   - Backend verifies Firebase ID token using Firebase Admin SDK
-   - Backend looks up user by phone number in Supabase
-   - Backend generates and returns JWT token (valid for 24 hours)
+   - Same Firebase phone auth flow
+   - Client sends token to `/auth/login`
+   - Backend verifies and returns JWT token (valid 24 hours)
 
-3. **Protected Routes**: All `/v1/*` endpoints require JWT token in `Authorization: Bearer <token>` header
-   - Token is validated on each request (not Firebase token, but API JWT token)
-   - User context is extracted from JWT token payload
-   - Backend connects to Supabase using service role key for data operations
+3. **Protected Routes**: 
+   - All `/v1/*` endpoints require JWT in `Authorization: Bearer <token>` header
+   - Token validated on each request
+   - User context extracted from JWT payload
 
-4. **Token Refresh**: Not implemented in initial version. User must login again after token expires.
-
-5. **Logout**: Token is invalidated (stored in blacklist if needed for immediate invalidation)
+4. **Logout**: 
+   - Token invalidated
+   - Push token cleared from server
 
 ---
 
-**Note**: This README will be updated as development progresses. See `TODO.md` for implementation tasks.
+## Key Features Summary
+
+✅ **Privacy-Preserving Location Sharing** - Geohash-based proximity detection  
+✅ **Real-Time Chat** - DMs with reactions, images, and meetup requests  
+✅ **Friend Discovery** - Contact sync with hashed phone numbers  
+✅ **User Statuses** - Instagram-style stories with scheduling  
+✅ **Meeting System** - Real-time attendance tracking for business accounts  
+✅ **Background Updates** - Location and message updates via WebSocket  
+✅ **First-Time Intro** - Onboarding screen shown once  
+✅ **Profile Customization** - Personal and business profiles  
+✅ **Email Verification** - Optional email linking  
+✅ **Self-Messaging** - Notes to self feature  
+✅ **Chat Management** - Hide chats, block users  
+
+---
+
+**Note**: See `MEETING_FEATURE.md` for detailed meeting system documentation.

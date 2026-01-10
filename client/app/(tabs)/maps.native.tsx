@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { formatDistanceToNow } from 'date-fns';
-// import geohash from 'ngeohash'; // Removed
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
@@ -147,7 +146,6 @@ export default function NearbyScreen() {
         <ThemedText type="defaultSemiBold" style={styles.username}>
           {item.real_name || item.username}
         </ThemedText>
-        {item.real_name && <ThemedText numberOfLines={1} style={{ fontSize: 12, opacity: 0.6 }}>@{item.username}</ThemedText>}
         {item.location_shared_at && (
           <ThemedText numberOfLines={1} style={{ fontSize: 11, opacity: 0.4, marginTop: 2 }}>
             Updated {formatDistanceToNow(new Date(item.location_shared_at), { addSuffix: true })}
@@ -161,17 +159,48 @@ export default function NearbyScreen() {
                   'Very far'}
         </ThemedText>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.actionButton, { backgroundColor: theme.tint }]}
-        onPress={() => {
-          // We need to find the DM ID or navigate to a screen that can handle it.
-          // For now, we can redirect to the chat tab or a search.
-          // Since they are friends, a DM likely exists or can be created.
-          router.push('/chats' as any);
-        }}
-      >
-        <IconSymbol name="message.fill" size={20} color="white" />
-      </TouchableOpacity>
+      {['beside_you', 'very_near', 'near', 'far', 'very_far'].includes(item.distance) ? (
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: theme.tint }]}
+          onPress={async () => {
+            try {
+              // Find existing DM
+              const chatsData = await apiRequest('/v1/messages/list');
+              const existingChat = chatsData.dms?.find((dm: any) => dm.user_id === item.id);
+
+              if (existingChat) {
+                router.push(`/chats/${existingChat.id}?meetup=true` as any);
+              } else {
+                router.push(`/user/${item.id}` as any);
+              }
+            } catch (e) {
+              console.error('Failed to find chat', e);
+              router.push(`/user/${item.id}` as any);
+            }
+          }}
+        >
+          <IconSymbol name="location.circle.fill" size={20} color="white" />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: theme.tint }]}
+          onPress={async () => {
+            try {
+              const chatsData = await apiRequest('/v1/messages/list');
+              const existingChat = chatsData.dms?.find((dm: any) => dm.user_id === item.id);
+              if (existingChat) {
+                router.push(`/chats/${existingChat.id}` as any);
+              } else {
+                router.push(`/user/${item.id}` as any);
+              }
+            } catch (e) {
+              router.push(`/chats` as any);
+            }
+          }}
+        >
+          <IconSymbol name="message.fill" size={20} color="white" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -202,7 +231,7 @@ export default function NearbyScreen() {
             <View style={styles.emptyContainer}>
               <ThemedText style={{ fontSize: 18, marginBottom: 10 }}>Map is for Friends</ThemedText>
               <ThemedText style={styles.emptySubtext}>
-                For privacy reasons, only friends are shown on the map.
+                No friends in range :(
               </ThemedText>
               <TouchableOpacity
                 style={[styles.permissionButton, { backgroundColor: theme.tint, marginTop: 20 }]}
@@ -214,7 +243,7 @@ export default function NearbyScreen() {
           }
           contentContainerStyle={[
             nearbyUsers.length === 0 && styles.emptyList,
-            { paddingBottom: insets.bottom + 80 }
+            { paddingBottom: insets.bottom + 120 }
           ]}
         />
       )}

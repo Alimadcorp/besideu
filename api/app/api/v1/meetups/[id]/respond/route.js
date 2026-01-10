@@ -13,9 +13,6 @@ export async function POST(req, { params }) {
 
     try {
         const { action, location } = await req.json();
-        if (!['accepted', 'declined'].includes(action)) {
-            return NextResponse.json({ error: 'action must be accepted or declined', code: 'bad_request' }, { status: 400 });
-        }
 
         // Fetch meetup
         const { data: meetup, error: fetchErr } = await supabaseAdmin
@@ -26,6 +23,37 @@ export async function POST(req, { params }) {
 
         if (fetchErr || !meetup) {
             return NextResponse.json({ error: 'Meetup request not found', code: 'not_found' }, { status: 404 });
+        }
+
+        if (action === 'update_location') {
+            if (meetup.requested_from !== user.id) {
+                return NextResponse.json({ error: 'Unauthorized to update location', code: 'forbidden' }, { status: 403 });
+            }
+            if (meetup.status !== 'accepted') {
+                // Check if it's expired
+                const created = new Date(meetup.created_at);
+                const now = new Date();
+                const diffHours = (now - created) / (1000 * 60 * 60);
+                if (diffHours > 24 && meetup.status === 'pending') {
+                    // Auto expire
+                    await supabaseAdmin.from('meetups').update({ status: 'expired' }).eq('id', meetupId);
+                    return NextResponse.json({ error: 'Meetup request expired', code: 'expired' }, { status: 400 });
+                }
+                return NextResponse.json({ error: 'Meetup is not accepted, cannot update location', code: 'invalid_status' }, { status: 400 });
+            }
+
+            // Allow update
+            const { error: updateErr } = await supabaseAdmin
+                .from('meetups')
+                .update({ location })
+                .eq('id', meetupId);
+
+            if (updateErr) throw updateErr;
+            return NextResponse.json({ success: true, status: 'accepted' });
+        }
+
+        if (!['accepted', 'declined'].includes(action)) {
+            return NextResponse.json({ error: 'action must be accepted or declined', code: 'bad_request' }, { status: 400 });
         }
 
         if (meetup.requested_from !== user.id) {

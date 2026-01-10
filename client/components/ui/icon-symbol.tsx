@@ -44,6 +44,8 @@ const MAPPING = {
   'link': 'link',
   'tag': 'local-offer',
   'calendar.badge.plus': 'edit-calendar',
+  'circle.dashed': 'donut-large',
+  'plus.circle.fill': 'add-circle',
 } as IconMapping;
 
 /**

@@ -139,33 +139,66 @@ export function hashPhone(phone: string): string {
     return sha256(normalized + GLOBAL_SALT);
 }
 
+// Memoization cache for phone hashing (speeds up repeated hashing)
+const phoneHashCache = new Map<string, string>();
+
 /**
- * Generates a privacy-preserving location hash from coordinates.
- * Quantizes coordinates to a grid of specified size (in km) and hashes the result.
- * @param lat Latitude
- * @param lon Longitude
- * @param gridSizeKm Grid size in kilometers (1, 3, or 5)
- * @returns SHA-256 hash of the grid cell
+ * Optimized batch phone hashing with caching
+ * @param phones Array of phone numbers to hash
+ * @returns Array of hashed phone numbers
  */
-export function hashLocationGrid(lat: number, lon: number, gridSizeKm: number): string {
-    if (typeof lat !== 'number' || typeof lon !== 'number' || typeof gridSizeKm !== 'number') return '';
-    
-    // Convert km to degrees (approximate: 1 degree ≈ 111 km)
-    // Using 111 km per degree as a good approximation
-    const degreesPerKm = 1 / 111;
-    const gridSizeDegrees = gridSizeKm * degreesPerKm;
-    
-    const gridLat = Math.floor(lat / gridSizeDegrees);
-    const gridLon = Math.floor(lon / gridSizeDegrees);
-    const gridString = `${gridLat}_${gridLon}_${gridSizeKm}`;
-    return sha256(gridString + GLOBAL_SALT);
+export function hashPhonesBatch(phones: string[]): string[] {
+    return phones.map(phone => {
+        // Check cache first
+        if (phoneHashCache.has(phone)) {
+            return phoneHashCache.get(phone)!;
+        }
+
+        // Hash and cache
+        const hash = hashPhone(phone);
+        if (hash) {
+            phoneHashCache.set(phone, hash);
+        }
+        return hash;
+    }).filter(Boolean); // Remove empty strings
 }
 
 /**
- * Generates all five location hashes (100m, 500m, 1km, 3km, 5km) for a given coordinate.
+ * Clear phone hash cache (call when memory is a concern)
+ */
+export function clearPhoneHashCache() {
+    phoneHashCache.clear();
+}
+
+
+/**
+ * Generates a privacy-preserving location grid identifier from coordinates.
+ * Quantizes coordinates to a grid of specified size (in km) WITHOUT hashing for speed.
  * @param lat Latitude
  * @param lon Longitude
- * @returns Object with all location hashes
+ * @param gridSizeKm Grid size in kilometers (0.1, 0.5, 1, 3, or 5)
+ * @returns Grid cell identifier string
+ */
+export function hashLocationGrid(lat: number, lon: number, gridSizeKm: number): string {
+    if (typeof lat !== 'number' || typeof lon !== 'number' || typeof gridSizeKm !== 'number') return '';
+
+    // Convert km to degrees (approximate: 1 degree ≈ 111 km)
+    const degreesPerKm = 1 / 111;
+    const gridSizeDegrees = gridSizeKm * degreesPerKm;
+
+    const gridLat = Math.floor(lat / gridSizeDegrees);
+    const gridLon = Math.floor(lon / gridSizeDegrees);
+
+    // Return grid identifier without hashing for speed
+    return `${gridLat}_${gridLon}_${gridSizeKm}`;
+}
+
+/**
+ * Generates all five location grid identifiers (100m, 500m, 1km, 3km, 5km) for a given coordinate.
+ * NO HASHING - uses raw grid coordinates for faster processing.
+ * @param lat Latitude
+ * @param lon Longitude
+ * @returns Object with all location grid identifiers
  */
 export function hashLocationAll(lat: number, lon: number) {
     return {
@@ -178,11 +211,12 @@ export function hashLocationAll(lat: number, lon: number) {
 }
 
 /**
- * Legacy function for backward compatibility - generates 5km hash
+ * Legacy function for backward compatibility - generates 5km grid
  * @param lat Latitude
  * @param lon Longitude
- * @returns SHA-256 hash of the 5km grid cell
+ * @returns Grid identifier for 5km cell
  */
 export function hashLocation(lat: number, lon: number): string {
     return hashLocationGrid(lat, lon, 5);
 }
+

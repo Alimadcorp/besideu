@@ -15,10 +15,10 @@ export async function PUT(req) {
     const body = await req.json();
     const { location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km, timestamp, meta } = body || {};
 
-    // Validate all five location hashes (SHA-256 hex strings)
+    // Validate all five location grid identifiers (format: gridLat_gridLon_gridSize)
     const hashes = { location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km };
     for (const [key, hash] of Object.entries(hashes)) {
-      if (!hash || typeof hash !== 'string' || hash.length !== 64) {
+      if (!hash || typeof hash !== 'string' || hash.length === 0) {
         return NextResponse.json(
           { error: `Invalid ${key}`, code: 'invalid_hash' },
           { status: 400 },

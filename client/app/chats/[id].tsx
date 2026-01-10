@@ -1,12 +1,13 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, View, TextInput, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator, Alert, Linking, Modal } from 'react-native';
+import { StyleSheet, View, TextInput, FlatList, Platform, TouchableOpacity, ActivityIndicator, Alert, Linking, Modal, Keyboard, Animated } from 'react-native';
 import { formatDistanceToNow, format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -68,7 +69,8 @@ type ChatData = {
 };
 
 export default function ChatScreen() {
-    const { id, type } = useLocalSearchParams();
+    const { id, type, meetup } = useLocalSearchParams();
+    const processedMeetupRef = useRef(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [chatUser, setChatUser] = useState<ChatData['user'] | null>(null);
     const [userProfile, setUserProfile] = useState<{ is_online?: boolean; last_online?: string } | null>(null);
@@ -76,9 +78,13 @@ export default function ChatScreen() {
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [showScheduleModal, setShowScheduleModal] = useState(false);
-    const [scheduleDate, setScheduleDate] = useState(new Date());
+    const [scheduleDate, setScheduleDate] = useState(new Date(Date.now() + 60 * 60 * 1000)); // Default to 1 hour from now
+    const [activeMeetupId, setActiveMeetupId] = useState<string | null>(null); // For tracking location
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
     const flatListRef = useRef<FlatList>(null);
+    const keyboardHeight = useRef(new Animated.Value(0)).current;
+    const [keyboardPadding, setKeyboardPadding] = useState(0);
 
     const router = useRouter();
     const colorScheme = useColorScheme();
@@ -163,7 +169,76 @@ export default function ChatScreen() {
             removeListener();
             clearInterval(profileInterval);
         };
+        return () => {
+            removeListener();
+            clearInterval(profileInterval);
+        };
     }, [fetchMessages, id, markAsRead, chatUser?.id, fetchUserProfile]);
+
+    // Active Meetup Location Tracking
+    useEffect(() => {
+        if (!activeMeetupId) return;
+
+        let startTime = Date.now();
+        const intervalId = setInterval(async () => {
+            if (Date.now() - startTime > 60 * 60 * 1000) { // 1 hour limit
+                setActiveMeetupId(null);
+                clearInterval(intervalId);
+                return;
+            }
+
+            try {
+                const location = await Location.getCurrentPositionAsync({});
+                await apiRequest(`/v1/meetups/${activeMeetupId}/respond`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'update_location',
+                        location: {
+                            lat: location.coords.latitude,
+                            long: location.coords.longitude,
+                            alt: location.coords.altitude
+                        }
+                    })
+                });
+                console.log('Updated meetup location');
+            } catch (e) {
+                console.error('Failed to update meetup location', e);
+            }
+        }, 60000); // Every 1 minute
+
+        return () => clearInterval(intervalId);
+    }, [activeMeetupId]);
+
+    useEffect(() => {
+        const keyboardWillShow = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            (e) => {
+                Animated.timing(keyboardHeight, {
+                    duration: Platform.OS === 'ios' ? e.duration : 250,
+                    toValue: e.endCoordinates.height,
+                    useNativeDriver: false,
+                }).start();
+                setKeyboardPadding(e.endCoordinates.height);
+            }
+        );
+
+        const keyboardWillHide = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            (e) => {
+                Animated.timing(keyboardHeight, {
+                    duration: Platform.OS === 'ios' ? e.duration : 250,
+                    toValue: 0,
+                    useNativeDriver: false,
+                }).start();
+                setKeyboardPadding(0);
+            }
+        );
+
+        return () => {
+            keyboardWillShow.remove();
+            keyboardWillHide.remove();
+        };
+    }, [keyboardHeight]);
 
     const sendMessage = async (textOverride?: string, imageUrl?: string, scheduledAt?: string) => {
         const textToSend = textOverride !== undefined ? textOverride : inputText;
@@ -245,7 +320,7 @@ export default function ChatScreen() {
         }
     };
 
-    const requestMeetup = async () => {
+    const requestMeetup = useCallback(async () => {
         Alert.alert(
             'Request Meetup',
             'Do you want to send a meetup request to this user?',
@@ -282,7 +357,17 @@ export default function ChatScreen() {
                 }
             ]
         );
-    };
+    }, [id, user]);
+
+    useEffect(() => {
+        if (meetup === 'true' && !processedMeetupRef.current && !loading) {
+            processedMeetupRef.current = true;
+            // Short delay to ensure loading is done
+            setTimeout(() => {
+                requestMeetup();
+            }, 500);
+        }
+    }, [meetup, loading, requestMeetup]);
 
     const acceptMeetup = async (messageId: string, requestId: string) => {
         try {
@@ -295,20 +380,20 @@ export default function ChatScreen() {
             setLoading(true);
             const location = await Location.getCurrentPositionAsync({});
 
-            await apiRequest(`/v1/messages/${id}/meetup`, {
+            await apiRequest(`/v1/meetups/${requestId}/respond`, {
                 method: 'POST',
                 body: JSON.stringify({
+                    action: 'accepted',
                     location: {
                         lat: location.coords.latitude,
                         long: location.coords.longitude,
                         alt: location.coords.altitude
-                    },
-                    timestamp: new Date().toISOString(),
-                    meta: { meetup_request_id: requestId }
+                    }
                 })
             });
 
-            Alert.alert('Success', 'Meetup accepted!');
+            Alert.alert('Success', 'Meetup accepted! Location sharing enabled for 1 hour.');
+            setActiveMeetupId(requestId);
             fetchMessages();
         } catch (error: any) {
             Alert.alert('Error', error.message || 'Failed to accept meetup');
@@ -357,19 +442,27 @@ export default function ChatScreen() {
 
     // Group messages with date headers
     const groupedMessages = React.useMemo(() => {
-        const grouped: Array<{ type: 'date' | 'message'; date?: string; message?: Message }> = [];
+        const grouped: Array<
+            { type: "date"; date: string } | { type: "message"; message: Message }
+        > = [];
+
         let lastDate: string | null = null;
 
-        messages.forEach((msg) => {
-            const msgDate = format(new Date(msg.timestamp), 'yyyy-MM-dd');
+        messages.forEach((msg, index) => {
+            const msgDate = format(new Date(msg.timestamp), "yyyy-MM-dd");
 
-            // Add date header if this is a new day
-            if (msgDate !== lastDate) {
-                grouped.push({ type: 'date', date: msg.timestamp });
-                lastDate = msgDate;
+            grouped.push({ type: "message", message: msg });
+
+            const nextMsg = messages[index + 1];
+            const nextDate = nextMsg
+                ? format(new Date(nextMsg.timestamp), "yyyy-MM-dd")
+                : null;
+
+            if (msgDate !== nextDate) {
+                grouped.push({ type: "date", date: msg.timestamp });
             }
 
-            grouped.push({ type: 'message', message: msg });
+            lastDate = msgDate;
         });
 
         return grouped;
@@ -386,6 +479,11 @@ export default function ChatScreen() {
             }
             lastTap = now;
         };
+
+        const meetupRequest = item.meetup_request;
+        const isExpired = meetupRequest?.status === 'expired' ||
+            (meetupRequest?.status === 'pending' && (Date.now() - new Date(item.timestamp).getTime() > 24 * 60 * 60 * 1000));
+        const displayStatus = isExpired ? 'expired' : meetupRequest?.status;
 
         return (
             <TouchableOpacity
@@ -442,15 +540,27 @@ export default function ChatScreen() {
                             <ThemedText type="defaultSemiBold">Meetup Request</ThemedText>
                         </View>
                         <ThemedText style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>
-                            Status: <ThemedText type="defaultSemiBold" style={{ textTransform: 'uppercase', fontSize: 12 }}>{item.meetup_request.status}</ThemedText>
+                            Status: <ThemedText type="defaultSemiBold" style={{
+                                textTransform: 'uppercase',
+                                fontSize: 12,
+                                color: displayStatus === 'expired' ? '#FF3B30' : theme.text
+                            }}>{displayStatus}</ThemedText>
                         </ThemedText>
 
-                        {item.meetup_request.status === 'pending' && !isMe && (
+                        {/* Expired State */}
+                        {displayStatus === 'expired' && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: -8, marginBottom: 4 }}>
+                                <IconSymbol name="exclamationmark.circle.fill" size={14} color="#FF3B30" />
+                                <ThemedText style={{ color: '#FF3B30', fontSize: 12 }}>This request has expired.</ThemedText>
+                            </View>
+                        )}
+
+                        {displayStatus === 'pending' && !isMe && (
                             <TouchableOpacity
                                 style={[styles.meetupBtn, { backgroundColor: theme.tint }]}
                                 onPress={() => acceptMeetup(item.id, item.meetup_request!.id)}
                             >
-                                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Accept & Share Location</ThemedText>
+                                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Share Location</ThemedText>
                             </TouchableOpacity>
                         )}
 
@@ -486,18 +596,14 @@ export default function ChatScreen() {
     }
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
+        <View style={styles.container}>
             <Stack.Screen
                 options={{
                     headerTitle: () => {
                         const isMeeting = (chatUser as any)?.is_meeting;
                         return (
                             <TouchableOpacity
-                                onPress={() => isMeeting ? router.push(`/meetings/${(chatUser as any).meeting_id}`) : router.push(`/user/${chatUser?.id}` as any)}
+                                onPress={() => isMeeting ? router.push(`/meetings/${(chatUser as any).meeting_id}` as any) : router.push(`/user/${chatUser?.id}` as any)}
                                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
                             >
                                 <View style={[styles.headerAvatar, { backgroundColor: isMeeting ? theme.text : theme.tint }]}>
@@ -524,13 +630,6 @@ export default function ChatScreen() {
                             </TouchableOpacity>
                         );
                     },
-                    headerRight: () => (
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                            <TouchableOpacity onPress={requestMeetup} style={styles.headerActionBtn}>
-                                <IconSymbol name="location.circle.fill" size={24} color={theme.tint} />
-                            </TouchableOpacity>
-                        </View>
-                    ),
                     headerTitleAlign: 'left',
                     headerBackVisible: true,
                     headerShadowVisible: false,
@@ -538,69 +637,75 @@ export default function ChatScreen() {
                 }}
             />
 
-            <FlatList
-                ref={flatListRef}
-                data={groupedMessages}
-                renderItem={({ item }) => {
-                    if (item.type === 'date' && item.date) {
-                        return (
-                            <View style={styles.dateHeaderContainer}>
-                                <View style={[styles.dateHeader, { backgroundColor: theme.background }]}>
-                                    <ThemedText style={[styles.dateHeaderText, { color: theme.icon + '80' }]}>
-                                        {formatDateHeader(item.date)}
-                                    </ThemedText>
+            <View style={{ flex: 1 }}>
+                <FlatList
+                    ref={flatListRef}
+                    data={groupedMessages}
+                    renderItem={({ item }) => {
+                        if (item.type === 'date' && item.date) {
+                            return (
+                                <View style={styles.dateHeaderContainer}>
+                                    <View style={[styles.dateHeader, { backgroundColor: theme.background }]}>
+                                        <ThemedText style={[styles.dateHeaderText, { color: theme.icon + '80' }]}>
+                                            {formatDateHeader(item.date)}
+                                        </ThemedText>
+                                    </View>
                                 </View>
-                            </View>
-                        );
-                    } else if (item.type === 'message' && item.message) {
-                        return renderMessage({ item: item.message });
-                    }
-                    return null;
-                }}
-                keyExtractor={(item, index) => item.type === 'date' ? `date-${item.date}` : item.message?.id || `msg-${index}`}
-                inverted
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-            />
-
-            <View style={[
-                styles.inputContainer,
-                {
-                    backgroundColor: theme.background,
-                    paddingBottom: insets.bottom + (Platform.OS === 'ios' ? 0 : 10),
-                    borderTopWidth: StyleSheet.hairlineWidth,
-                    borderTopColor: theme.icon + '20',
-                }
-            ]}>
-                <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
-                    <IconSymbol size={24} name="camera.fill" color={theme.icon} />
-                </TouchableOpacity>
-                <TextInput
-                    style={[styles.input, { color: theme.text, backgroundColor: 'rgba(0,0,0,0.03)', borderColor: 'transparent' }]}
-                    placeholder="Message..."
-                    placeholderTextColor="#999"
-                    value={inputText}
-                    onChangeText={setInputText}
-                    multiline
+                            );
+                        } else if (item.type === 'message' && item.message) {
+                            return renderMessage({ item: item.message });
+                        }
+                        return null;
+                    }}
+                    keyExtractor={(item, index) => item.type === 'date' ? `date-${item.date}` : item.message?.id || `msg-${index}`}
+                    inverted
+                    contentContainerStyle={[styles.listContent, { paddingBottom: 120 + keyboardPadding }]}
+                    showsVerticalScrollIndicator={false}
                 />
-                <TouchableOpacity
-                    onPress={() => setShowScheduleModal(true)}
-                    style={styles.attachButton}
-                    disabled={!inputText.trim()}
-                >
-                    <IconSymbol size={24} name="clock.fill" color={inputText.trim() ? theme.tint : theme.icon} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={() => sendMessage()}
-                    disabled={sending || (!inputText.trim())}
-                    style={[styles.sendButton, { opacity: sending || !inputText.trim() ? 0.3 : 1 }]}
-                >
-                    {sending && !inputText.trim() ? (
-                        <ActivityIndicator size="small" color={theme.tint} />
-                    ) : (
-                        <IconSymbol size={32} name="arrow.up.circle.fill" color={theme.tint} />
-                    )}
-                </TouchableOpacity>
+
+                <Animated.View style={[
+                    styles.inputContainer,
+                    {
+                        backgroundColor: theme.background,
+                        paddingBottom: insets.bottom + (Platform.OS === 'ios' ? 0 : 10),
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderTopColor: theme.icon + '20',
+                        position: 'absolute',
+                        bottom: keyboardHeight,
+                        left: 0,
+                        right: 0,
+                    }
+                ]}>
+                    <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
+                        <IconSymbol size={24} name="camera.fill" color={theme.icon} />
+                    </TouchableOpacity>
+                    <TextInput
+                        style={[styles.input, { color: theme.text, backgroundColor: 'rgba(0,0,0,0.03)', borderColor: 'transparent' }]}
+                        placeholder="Message..."
+                        placeholderTextColor="#999"
+                        value={inputText}
+                        onChangeText={setInputText}
+                        multiline
+                    />
+                    <TouchableOpacity
+                        onPress={() => setShowScheduleModal(true)}
+                        style={styles.attachButton}
+                        disabled={!inputText.trim()}
+                    >
+                        <IconSymbol size={24} name="clock.fill" color={inputText.trim() ? theme.tint : theme.icon} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => sendMessage()}
+                        disabled={sending || (!inputText.trim())}
+                        style={[styles.sendButton, { opacity: sending || !inputText.trim() ? 0.3 : 1 }]}
+                    >
+                        {sending && !inputText.trim() ? (
+                            <ActivityIndicator size="small" color={theme.tint} />
+                        ) : (
+                            <IconSymbol size={32} name="arrow.up.circle.fill" color={theme.tint} />
+                        )}
+                    </TouchableOpacity>
+                </Animated.View>
             </View>
 
             {/* Schedule Message Modal */}
@@ -613,165 +718,98 @@ export default function ChatScreen() {
                 <View style={styles.modalOverlay}>
                     <ThemedView style={styles.modalContent}>
                         <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Schedule Message</ThemedText>
-                        <ThemedText style={{ marginBottom: 15, opacity: 0.7 }}>When should this be sent?</ThemedText>
+                        <ThemedText style={{ marginBottom: 20, opacity: 0.7 }}>Pick a date and time to send this message</ThemedText>
+
+                        <View style={{ marginBottom: 20 }}>
+                            <ThemedText style={{ fontSize: 16, marginBottom: 10, fontWeight: '600' }}>Selected Time:</ThemedText>
+                            <ThemedText style={{ fontSize: 15, color: theme.tint }}>
+                                {scheduleDate.toLocaleString('en-US', {
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                })}
+                            </ThemedText>
+                        </View>
 
                         <View style={{ gap: 10 }}>
                             <TouchableOpacity
-                                style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]}
-                                onPress={() => {
-                                    sendMessage(undefined, undefined, new Date(Date.now() + 60 * 60 * 1000).toISOString());
-                                    setShowScheduleModal(false);
-                                }}
+                                style={[styles.presetBtn, { backgroundColor: theme.tint, marginBottom: 10 }]}
+                                onPress={() => setShowDatePicker(true)}
                             >
-                                <ThemedText>In 1 Hour</ThemedText>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]}
-                                onPress={() => {
-                                    sendMessage(undefined, undefined, new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString());
-                                    setShowScheduleModal(false);
-                                }}
-                            >
-                                <ThemedText>In 4 Hours</ThemedText>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]}
-                                onPress={() => {
-                                    const tomorrow = new Date();
-                                    tomorrow.setDate(tomorrow.getDate() + 1);
-                                    tomorrow.setHours(9, 0, 0, 0);
-                                    sendMessage(undefined, undefined, tomorrow.toISOString());
-                                    setShowScheduleModal(false);
-                                }}
-                            >
-                                <ThemedText>Tomorrow at 9 AM</ThemedText>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]}
-                                onPress={() => {
-                                    const twoDays = new Date();
-                                    twoDays.setDate(twoDays.getDate() + 2);
-                                    twoDays.setHours(9, 0, 0, 0);
-                                    sendMessage(undefined, undefined, twoDays.toISOString());
-                                    setShowScheduleModal(false);
-                                }}
-                            >
-                                <ThemedText>In 2 Days</ThemedText>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.presetBtn, { backgroundColor: theme.tint + '20' }]}
-                                onPress={() => {
-                                    setShowScheduleModal(false);
-                                    setShowDatePicker(true);
-                                }}
-                            >
-                                <ThemedText style={{ color: theme.tint, fontWeight: 'bold' }}>Custom Date & Time</ThemedText>
+                                <IconSymbol name="calendar" size={20} color="white" />
+                                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Pick Date & Time</ThemedText>
                             </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity
-                            style={[styles.modalBtn, { marginTop: 15, alignSelf: 'flex-end' }]}
-                            onPress={() => setShowScheduleModal(false)}
-                        >
-                            <ThemedText>Cancel</ThemedText>
-                        </TouchableOpacity>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: theme.icon + '20' }]}
+                                onPress={() => setShowScheduleModal(false)}
+                            >
+                                <ThemedText>Cancel</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalBtn, { backgroundColor: theme.tint }]}
+                                onPress={() => {
+                                    const now = new Date();
+                                    if (scheduleDate <= now) {
+                                        Alert.alert('Invalid Time', 'Please select a future time');
+                                        return;
+                                    }
+                                    sendMessage(undefined, undefined, scheduleDate.toISOString());
+                                    setShowScheduleModal(false);
+                                }}
+                            >
+                                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Schedule</ThemedText>
+                            </TouchableOpacity>
+                        </View>
                     </ThemedView>
                 </View>
             </Modal>
 
-            {/* Date Picker Modal */}
+            {/* Native Date Picker */}
             {showDatePicker && (
-                <Modal
-                    visible={showDatePicker}
-                    transparent={true}
-                    animationType="fade"
-                    onRequestClose={() => setShowDatePicker(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <ThemedView style={styles.modalContent}>
-                            <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Select Date & Time</ThemedText>
-
-                            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                                <TextInput
-                                    style={[styles.dateInput, { color: theme.text, borderColor: theme.icon + '40' }]}
-                                    value={scheduleDate.toLocaleString()}
-                                    editable={false}
-                                />
-                                <ThemedText style={{ fontSize: 12, opacity: 0.6, marginTop: 5 }}>
-                                    Tap buttons below to adjust
-                                </ThemedText>
-                            </View>
-
-                            <View style={{ gap: 10, marginBottom: 20 }}>
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <TouchableOpacity
-                                        style={[styles.timeBtn, { backgroundColor: theme.icon + '10', flex: 1 }]}
-                                        onPress={() => {
-                                            const newDate = new Date(scheduleDate);
-                                            newDate.setHours(newDate.getHours() + 1);
-                                            setScheduleDate(newDate);
-                                        }}
-                                    >
-                                        <ThemedText>+1 Hour</ThemedText>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.timeBtn, { backgroundColor: theme.icon + '10', flex: 1 }]}
-                                        onPress={() => {
-                                            const newDate = new Date(scheduleDate);
-                                            newDate.setDate(newDate.getDate() + 1);
-                                            setScheduleDate(newDate);
-                                        }}
-                                    >
-                                        <ThemedText>+1 Day</ThemedText>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <TouchableOpacity
-                                    style={[styles.timeBtn, { backgroundColor: theme.icon + '10' }]}
-                                    onPress={() => setScheduleDate(new Date())}
-                                >
-                                    <ThemedText>Reset to Now</ThemedText>
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.modalBtn, { backgroundColor: theme.icon + '20' }]}
-                                    onPress={() => setShowDatePicker(false)}
-                                >
-                                    <ThemedText>Cancel</ThemedText>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.modalBtn, { backgroundColor: theme.tint }]}
-                                    onPress={() => {
-                                        const now = new Date();
-                                        const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-                                        if (scheduleDate <= now) {
-                                            Alert.alert('Invalid Time', 'Please select a future time');
-                                            return;
-                                        }
-                                        if (scheduleDate > sevenDays) {
-                                            Alert.alert('Too Far Ahead', 'You can only schedule up to 7 days in advance');
-                                            return;
-                                        }
-
-                                        sendMessage(undefined, undefined, scheduleDate.toISOString());
-                                        setShowDatePicker(false);
-                                    }}
-                                >
-                                    <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Schedule</ThemedText>
-                                </TouchableOpacity>
-                            </View>
-                        </ThemedView>
-                    </View>
-                </Modal>
+                <DateTimePicker
+                    value={scheduleDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    minimumDate={new Date()}
+                    onChange={(event, selectedDate) => {
+                        if (Platform.OS === 'android') {
+                            setShowDatePicker(false);
+                        }
+                        if (selectedDate) {
+                            setScheduleDate(selectedDate);
+                            if (Platform.OS === 'android') {
+                                // On Android, show time picker after date is selected
+                                setTimeout(() => setShowTimePicker(true), 100);
+                            } else {
+                                // On iOS, show time picker immediately
+                                setShowDatePicker(false);
+                                setShowTimePicker(true);
+                            }
+                        }
+                    }}
+                />
             )}
-        </KeyboardAvoidingView>
+
+            {/* Native Time Picker */}
+            {showTimePicker && (
+                <DateTimePicker
+                    value={scheduleDate}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                        setShowTimePicker(false);
+                        if (selectedDate) {
+                            setScheduleDate(selectedDate);
+                        }
+                    }}
+                />
+            )}
+        </View>
     );
 }
 
@@ -949,6 +987,8 @@ const styles = StyleSheet.create({
     },
     presetBtn: {
         height: 50,
+        flexDirection: 'row',
+        gap: 10,
         justifyContent: 'center',
         alignItems: 'center',
         borderRadius: 10,

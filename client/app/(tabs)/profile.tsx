@@ -1,10 +1,11 @@
-import { StyleSheet, Switch, TouchableOpacity, ScrollView, Alert, View, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { StyleSheet, Switch, TouchableOpacity, ScrollView, Alert, View, ActivityIndicator, Modal, TextInput, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,6 +15,15 @@ import { useAuth } from '@/context/AuthContext';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { apiRequest } from '@/utils/api';
 import { auth } from '@/utils/firebase';
+
+const QUOTES = [
+    "Wo line maarne waale uncle zara bahir gaye hain",
+    "The best way to predict the future is to create it.",
+    "In the end, we only regret the chances we didn't take.",
+    "Happiness is only real when shared.",
+    "Life is short. Make every connection count.",
+    "Someone somewhere right now is beside someone else"
+];
 
 export default function ProfileScreen() {
     const { user: authUser, signOut } = useAuth();
@@ -151,9 +161,10 @@ export default function ProfileScreen() {
     const [isExpirationModalVisible, setIsExpirationModalVisible] = useState(false);
     const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
     const [isScheduleDatePickerVisible, setIsScheduleDatePickerVisible] = useState(false);
+    const [isScheduleTimePickerVisible, setIsScheduleTimePickerVisible] = useState(false);
     const [isScheduleStatusInputVisible, setIsScheduleStatusInputVisible] = useState(false);
     const [isScheduleExpirationVisible, setIsScheduleExpirationVisible] = useState(false);
-    const [scheduledTime, setScheduledTime] = useState(new Date());
+    const [scheduledTime, setScheduledTime] = useState(new Date(Date.now() + 60 * 60 * 1000)); // Default to 1 hour from now
     const [scheduledStatusText, setScheduledStatusText] = useState('');
     const [editMode, setEditMode] = useState<{ field: string, label: string, multiline?: boolean } | null>(null);
     const [tempValue, setTempValue] = useState('');
@@ -583,13 +594,18 @@ export default function ProfileScreen() {
                     </View>
 
                     <View style={[styles.row, { borderBottomColor: theme.icon }]}>
-                        <ThemedText style={styles.rowLabel}>Made by</ThemedText>
-                        <ThemedText style={styles.rowValue}>Muhammad Ali</ThemedText>
+                        <ThemedText style={styles.rowLabel}>An app by</ThemedText>
+                        <ThemedText style={styles.rowValue}>Habeebullah Wattoo</ThemedText>
                     </View>
+
+                    {/* <View style={[styles.row, { borderBottomColor: theme.icon }]}>
+                        <ThemedText style={styles.rowLabel}>Developed by</ThemedText>
+                        <ThemedText style={styles.rowValue}>Muhammad Ali</ThemedText>
+                    </View> */}
                 </View>
 
                 {/* Business Tools */}
-                {user?.is_business && (
+                {user?.is_business && false && (
                     <View style={styles.section}>
                         <ThemedText type="subtitle" style={styles.sectionTitle}>Business Tools</ThemedText>
                         <TouchableOpacity style={[styles.row, { borderBottomColor: theme.icon }]} onPress={() => router.push('/meetings/create')}>
@@ -605,7 +621,7 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.footer}>
-                    <ThemedText style={styles.footerText}>&quot;Wo line maarne waale uncle zara bahir gaye hain&quot;</ThemedText>
+                    <ThemedText style={styles.footerText}>"{QUOTES[new Date().getDate() % QUOTES.length]}"</ThemedText>
                 </View>
 
             </ScrollView>
@@ -690,28 +706,31 @@ export default function ProfileScreen() {
                 <View style={styles.modalOverlay}>
                     <ThemedView style={styles.modalContent}>
                         <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Schedule Status Update</ThemedText>
-                        <ThemedText style={{ marginBottom: 15, opacity: 0.7 }}>When should this go live?</ThemedText>
+                        <ThemedText style={{ marginBottom: 20, opacity: 0.7 }}>Pick when your status should go live</ThemedText>
+
+                        <View style={{ marginBottom: 20 }}>
+                            <ThemedText style={{ fontSize: 16, marginBottom: 10, fontWeight: '600' }}>Selected Time:</ThemedText>
+                            <ThemedText style={{ fontSize: 15, color: theme.tint }}>
+                                {scheduledTime.toLocaleString('en-US', {
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                })}
+                            </ThemedText>
+                        </View>
+
                         <View style={styles.presetList}>
-                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(1)}>
-                                <ThemedText>In 1 Hour</ThemedText>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(6)}>
-                                <ThemedText>In 6 Hours</ThemedText>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(24)}>
-                                <ThemedText>Tomorrow</ThemedText>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(48)}>
-                                <ThemedText>In 2 Days</ThemedText>
-                            </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.presetBtn, { backgroundColor: theme.tint + '20' }]}
+                                style={[styles.presetBtn, { backgroundColor: theme.tint }]}
                                 onPress={() => {
                                     setIsScheduleModalVisible(false);
                                     setIsScheduleDatePickerVisible(true);
                                 }}
                             >
-                                <ThemedText style={{ color: theme.tint, fontWeight: 'bold' }}>Custom Date & Time</ThemedText>
+                                <IconSymbol name="calendar" size={20} color="white" />
+                                <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Pick Date & Time</ThemedText>
                             </TouchableOpacity>
                             <TouchableOpacity style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]} onPress={() => setSchedule(null)}>
                                 <ThemedText style={{ color: 'red' }}>Clear Scheduled</ThemedText>
@@ -727,93 +746,47 @@ export default function ProfileScreen() {
                 </View>
             </Modal>
 
-            {/* Custom Schedule Date Picker */}
+            {/* Native Date Picker for Schedule */}
             {isScheduleDatePickerVisible && (
-                <Modal
-                    visible={isScheduleDatePickerVisible}
-                    transparent={true}
-                    animationType="fade"
-                    onRequestClose={() => setIsScheduleDatePickerVisible(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <ThemedView style={styles.modalContent}>
-                            <ThemedText type="subtitle" style={{ marginBottom: 15 }}>Select Date & Time</ThemedText>
+                <DateTimePicker
+                    value={scheduledTime}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    minimumDate={new Date()}
+                    onChange={(event, selectedDate) => {
+                        if (Platform.OS === 'android') {
+                            setIsScheduleDatePickerVisible(false);
+                        }
+                        if (selectedDate) {
+                            setScheduledTime(selectedDate);
+                            if (Platform.OS === 'android') {
+                                // On Android, show time picker after date is selected
+                                setTimeout(() => setIsScheduleTimePickerVisible(true), 100);
+                            } else {
+                                // On iOS, show time picker immediately
+                                setIsScheduleDatePickerVisible(false);
+                                setIsScheduleTimePickerVisible(true);
+                            }
+                        }
+                    }}
+                />
+            )}
 
-                            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                                <TextInput
-                                    style={[styles.modalInput, { color: theme.text, borderColor: theme.icon + '40', textAlign: 'center' }]}
-                                    value={scheduledTime.toLocaleString()}
-                                    editable={false}
-                                />
-                                <ThemedText style={{ fontSize: 12, opacity: 0.6, marginTop: 5 }}>
-                                    Tap buttons below to adjust
-                                </ThemedText>
-                            </View>
-
-                            <View style={{ gap: 10, marginBottom: 20 }}>
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <TouchableOpacity
-                                        style={[styles.presetBtn, { backgroundColor: theme.icon + '10', flex: 1 }]}
-                                        onPress={() => {
-                                            const newDate = new Date(scheduledTime);
-                                            newDate.setHours(newDate.getHours() + 1);
-                                            setScheduledTime(newDate);
-                                        }}
-                                    >
-                                        <ThemedText>+1 Hour</ThemedText>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.presetBtn, { backgroundColor: theme.icon + '10', flex: 1 }]}
-                                        onPress={() => {
-                                            const newDate = new Date(scheduledTime);
-                                            newDate.setDate(newDate.getDate() + 1);
-                                            setScheduledTime(newDate);
-                                        }}
-                                    >
-                                        <ThemedText>+1 Day</ThemedText>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <TouchableOpacity
-                                    style={[styles.presetBtn, { backgroundColor: theme.icon + '10' }]}
-                                    onPress={() => setScheduledTime(new Date())}
-                                >
-                                    <ThemedText>Reset to Now</ThemedText>
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.modalBtn, { backgroundColor: theme.icon + '20' }]}
-                                    onPress={() => setIsScheduleDatePickerVisible(false)}
-                                >
-                                    <ThemedText>Cancel</ThemedText>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.modalBtn, { backgroundColor: theme.tint }]}
-                                    onPress={() => {
-                                        const now = new Date();
-                                        const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-                                        if (scheduledTime <= now) {
-                                            Alert.alert('Invalid Time', 'Please select a future time');
-                                            return;
-                                        }
-                                        if (scheduledTime > sevenDays) {
-                                            Alert.alert('Too Far Ahead', 'You can only schedule up to 7 days in advance');
-                                            return;
-                                        }
-
-                                        setIsScheduleDatePickerVisible(false);
-                                        setIsScheduleStatusInputVisible(true);
-                                    }}
-                                >
-                                    <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Next</ThemedText>
-                                </TouchableOpacity>
-                            </View>
-                        </ThemedView>
-                    </View>
-                </Modal>
+            {/* Native Time Picker for Schedule */}
+            {isScheduleTimePickerVisible && (
+                <DateTimePicker
+                    value={scheduledTime}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                        setIsScheduleTimePickerVisible(false);
+                        if (selectedDate) {
+                            setScheduledTime(selectedDate);
+                            // After time is selected, show status input
+                            setIsScheduleStatusInputVisible(true);
+                        }
+                    }}
+                />
             )}
 
             {/* Status Input Modal */}
@@ -1114,6 +1087,8 @@ const styles = StyleSheet.create({
     },
     presetBtn: {
         height: 50,
+        flexDirection: 'row',
+        gap: 10,
         justifyContent: 'center',
         alignItems: 'center',
         borderRadius: 10,

@@ -58,7 +58,8 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-notifications",
-      "expo-background-fetch"
+      "expo-background-fetch",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getToken, setToken, removeToken, getUser, setUser as storeUser } from '@/utils/storage';
 import { apiRequest, setOnUnauthorizedCallback } from '@/utils/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { connectWebSocket, disconnectWebSocket } from '@/utils/socket';
 
@@ -16,17 +17,21 @@ type User = {
 type AuthContextType = {
     user: User | null;
     isLoading: boolean;
+    isFirstLaunch: boolean;
     signIn: (firebaseToken: string) => Promise<void>;
     signUp: (firebaseToken: string, username: string, realName: string, email?: string) => Promise<void>;
     signOut: () => Promise<void>;
+    setHasSeenIntro: () => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
     isLoading: true,
+    isFirstLaunch: false,
     signIn: async () => { },
     signUp: async () => { },
     signOut: async () => { },
+    setHasSeenIntro: () => { },
 });
 
 export function useAuth() {
@@ -45,6 +50,7 @@ async function registerPush() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isFirstLaunch, setIsFirstLaunch] = useState(false);
 
     useEffect(() => {
         checkAuth();
@@ -57,6 +63,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             const token = await getToken();
             const userData = await getUser();
+            const hasSeenIntro = await AsyncStorage.getItem('hasSeenIntro');
+
+            setIsFirstLaunch(hasSeenIntro === null);
+
             if (token && userData) {
                 setUser(userData);
                 connectWebSocket();
@@ -116,14 +126,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function signOut() {
-        try {
-            await apiRequest('/v1/user/settings', {
-                method: 'PUT',
-                body: JSON.stringify({ expo_push_token: null }),
-            });
-            await apiRequest('/v1/logout', { method: 'POST' });
-        } catch (e) {
-            console.log('Logout API failed', e);
+        const token = await getToken();
+        if (token) {
+            try {
+                await apiRequest('/v1/user/settings', {
+                    method: 'PUT',
+                    body: JSON.stringify({ expo_push_token: null }),
+                });
+                await apiRequest('/v1/logout', { method: 'POST' });
+            } catch (e) {
+                console.log('Logout API failed', e);
+            }
         }
         await removeToken();
         disconnectWebSocket();
@@ -131,9 +144,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.replace('/auth/login');
     }
 
-    return (
-        <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    router.replace('/auth/login');
+}
+
+const setHasSeenIntro = async () => {
+    await AsyncStorage.setItem('hasSeenIntro', 'true');
+    setIsFirstLaunch(false);
+}
+
+return (
+    <AuthContext.Provider value={{ user, isLoading, isFirstLaunch, signIn, signUp, signOut, setHasSeenIntro }}>
+        {children}
+    </AuthContext.Provider>
+);
 }

@@ -2,291 +2,372 @@ import express from 'express';
 import expressWs from 'express-ws';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import url from 'url';
-
-// --- Environment Setup ---
-const PORT = process.env.PORT || 2999;
-const NODE_ENV = process.env.NODE_ENV || 'development';
-
-// Only load .env manually if not in production and file exists
-if (NODE_ENV !== 'production' && fs.existsSync('.env')) {
-  console.log('[Socket] Loading local .env file...');
-  const envConfig = fs.readFileSync('.env').toString();
-  for (const line of envConfig.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const [key, ...valParts] = trimmed.split('=');
-    const keyTrimmed = key.trim();
-    const valTrimmed = valParts.join('=').trim();
-    // Do NOT overwrite existing environment variables (prioritize Railway/System env)
-    if (keyTrimmed && valTrimmed && !process.env[keyTrimmed]) {
-      process.env[keyTrimmed] = valTrimmed;
-    }
-  }
-}
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// Debug info (safe keys only)
-console.log(`[Socket] Environment: ${NODE_ENV}`);
-console.log(`[Socket] Port: ${PORT}`);
-console.log(`[Socket] Supabase URL: ${SUPABASE_URL ? 'PRESENT' : 'MISSING'}`);
-console.log(`[Socket] Supabase Key: ${SUPABASE_SERVICE_ROLE_KEY ? 'PRESENT' : 'MISSING'}`);
-console.log(`[Socket] JWT Secret: ${JWT_SECRET ? 'PRESENT' : 'MISSING'}`);
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !JWT_SECRET) {
-  console.error('[Socket] FATAL: Missing required environment variables');
-  // Don't exit in dev, but definitely will fail in prod
-  if (NODE_ENV === 'production') process.exit(1);
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 const app = express();
-// Enable express-ws
-const wsInstance = expressWs(app);
+expressWs(app);
 
-// userId -> Set of WebSocket connections
-const textClients = new Map();
+const PORT = process.env.PORT || 2999;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const verifyToken = (token) => {
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error('Missing required environment variables');
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// Store active connections: userId -> Set of WebSocket connections
+const connections = new Map();
+
+// Helper to broadcast to a specific user
+function broadcastToUser(userId, message) {
+  const userConnections = connections.get(userId);
+  if (userConnections) {
+    const messageStr = JSON.stringify(message);
+    userConnections.forEach(ws => {
+      if (ws.readyState === 1) { // OPEN
+        ws.send(messageStr);
+      }
+    });
+  }
+}
+
+// Helper to broadcast to multiple users
+function broadcastToUsers(userIds, message) {
+  userIds.forEach(userId => broadcastToUser(userId, message));
+}
+
+// WebSocket endpoint
+app.ws('/', async (ws, req) => {
+  let userId = null;
+  let heartbeatInterval = null;
+
   try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (err) {
-    console.error(`[Socket] Token verification failed: ${err.message}`);
-    return null;
-  }
-};
+    // Extract token from query or header
+    const token = req.query.token || req.headers.authorization?.replace('Bearer ', '');
 
-app.use(express.json());
-
-// --- Health Check ---
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    env: NODE_ENV,
-    connections: wsInstance.getWss().clients.size,
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
-});
-
-// --- WebSocket Handler ---
-app.ws('/', (ws, req) => {
-  let user = null;
-
-  // 1. Try Authorization header
-  let token = req.headers['authorization']?.replace('Bearer ', '');
-
-  // 2. Try Sec-WebSocket-Protocol (common for some clients)
-  if (!token && req.headers['sec-websocket-protocol']) {
-    token = req.headers['sec-websocket-protocol'];
-  }
-
-  // 3. Try Query Params (Best fallback for RN/Web)
-  if (!token) {
-    const parsedUrl = url.parse(req.url, true);
-    token = parsedUrl.query.token;
-  }
-
-  if (token) {
-    const decoded = verifyToken(token);
-    if (decoded) {
-      user = decoded;
+    if (!token) {
+      ws.close(4001, 'No token provided');
+      return;
     }
-  }
 
-  if (!user || (!user.id && !user.sub)) {
-    console.log(`[Socket] REJECTED: Unauthorized connection attempt.`);
-    ws.close(4001, 'Unauthorized');
-    return;
-  }
+    // Verify JWT
+    const decoded = jwt.verify(token, JWT_SECRET);
+    userId = decoded.userId || decoded.id || decoded.sub;
 
-  const userId = user.id || user.sub;
-  const username = user.username || 'unknown';
-  console.log(`[Socket] CONNECTED: ${userId} (${username})`);
+    if (!userId) {
+      ws.close(4001, 'Invalid token');
+      return;
+    }
 
-  if (!textClients.has(userId)) {
-    textClients.set(userId, new Set());
-    // Set user as online when first connection is established
-    const now = new Date().toISOString();
-    supabase
-      .from('users')
-      .update({ is_online: true, last_online: now })
-      .eq('id', userId)
-      .then(({ error }) => {
-        if (error) console.error('[Socket] Error setting user online', error);
-      });
-  }
-  textClients.get(userId).add(ws);
+    // Add connection to map
+    if (!connections.has(userId)) {
+      connections.set(userId, new Set());
+    }
+    connections.get(userId).add(ws);
 
-  ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; });
+    console.log(`[WS] User ${userId} connected (${connections.get(userId).size} connections)`);
 
-  ws.on('message', async (msg) => {
-    try {
-      const data = JSON.parse(msg);
-      if (data.type === 'location_update' && data.payload) {
-        const { location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km } = data.payload;
-        if (location_hash_100m && location_hash_500m && location_hash_1km && location_hash_3km && location_hash_5km) {
-          const now = new Date().toISOString();
-          const { error } = await supabase
-            .from('user_locations')
-            .upsert({
-              user_id: userId,
-              location_hash_100m,
-              location_hash_500m,
-              location_hash_1km,
-              location_hash_3km,
-              location_hash_5km,
-              updated_at: now
-            });
-          if (error) {
-            console.error('[Socket] DB ERROR: location_update', error);
-          } else {
-            // Update user's last_online timestamp
-            await supabase
-              .from('users')
-              .update({ last_online: now })
-              .eq('id', userId);
-          }
+    // Send welcome message
+    ws.send(JSON.stringify({ type: 'connected', payload: { userId } }));
+
+    // Setup heartbeat
+    heartbeatInterval = setInterval(() => {
+      if (ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000); // Every 30 seconds
+
+    // Handle incoming messages
+    ws.on('message', async (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+
+        switch (message.type) {
+          case 'pong':
+            // Heartbeat response
+            break;
+
+          case 'location_update':
+            // Update location in database
+            const { location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km } = message.payload || {};
+
+            if (location_hash_100m && location_hash_500m && location_hash_1km && location_hash_3km && location_hash_5km) {
+              await supabase
+                .from('user_locations')
+                .upsert({
+                  user_id: userId,
+                  location_hash_100m,
+                  location_hash_500m,
+                  location_hash_1km,
+                  location_hash_3km,
+                  location_hash_5km,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+              // Update last_online
+              await supabase
+                .from('users')
+                .update({ last_online: new Date().toISOString() })
+                .eq('id', userId);
+            }
+            break;
+
+          default:
+            console.log(`[WS] Unknown message type: ${message.type}`);
         }
+      } catch (err) {
+        console.error('[WS] Message handling error:', err);
       }
-    } catch (err) {
-      console.error('[Socket] ERROR: Invalid JSON message', err);
-    }
-  });
+    });
 
-  ws.on('close', (code, reason) => {
-    if (textClients.has(userId)) {
-      textClients.get(userId).delete(ws);
-      if (textClients.get(userId).size === 0) {
-        textClients.delete(userId);
-        // Set user as offline when last connection is closed
-        const now = new Date().toISOString();
-        supabase
-          .from('users')
-          .update({ is_online: false, last_online: now })
-          .eq('id', userId)
-          .then(({ error }) => {
-            if (error) console.error('[Socket] Error setting user offline', error);
-          });
+    // Handle disconnection
+    ws.on('close', () => {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+      if (userId && connections.has(userId)) {
+        connections.get(userId).delete(ws);
+        if (connections.get(userId).size === 0) {
+          connections.delete(userId);
+        }
+        console.log(`[WS] User ${userId} disconnected`);
       }
-    }
-    console.log(`[Socket] DISCONNECTED: ${userId} (Code: ${code}, Reason: ${reason})`);
-  });
+    });
 
-  ws.on('error', (err) => {
-    // console.error(`[Socket] ERROR for user ${userId}:`, err);
-  });
+    ws.on('error', (err) => {
+      console.error('[WS] Socket error:', err);
+    });
+
+  } catch (err) {
+    console.error('[WS] Connection error:', err);
+    ws.close(4001, 'Authentication failed');
+  }
 });
 
-// Ping interval (30s)
-const interval = setInterval(() => {
-  wsInstance.getWss().clients.forEach((ws) => {
-    if (ws.isAlive === false) {
-      console.log('[Socket] PRUNING: Terminating inactive connection');
-      return ws.terminate();
-    }
-    ws.isAlive = false;
-    ws.ping();
-  });
-}, 30000);
-
-wsInstance.getWss().on('close', () => clearInterval(interval));
-
-// --- Supabase Realtime ---
-const handleRealtime = () => {
-  console.log('[Socket] Initializing Supabase Realtime...');
-
-  // Helper to send to specific user
-  const notifyUser = (uid, data) => {
-    if (uid && textClients.has(uid)) {
-      const message = JSON.stringify(data);
-      textClients.get(uid).forEach(client => {
-        if (client.readyState === 1) client.send(message);
-      });
-    }
-  };
-
-  // 1. Messages
+// Setup Supabase realtime subscriptions
+async function setupRealtimeSubscriptions() {
+  // Subscribe to new messages
   supabase
-    .channel('messages-channel')
+    .channel('messages')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-      const newMsg = payload.new;
-      console.log(`[Socket] NOTIFY: Message in DM ${newMsg.dm_id}`);
+      const message = payload.new;
 
-      const { data: friendRow } = await supabase
+      // Get DM participants
+      const { data: dm } = await supabase
         .from('friends')
         .select('user_id_1, user_id_2')
-        .eq('id', newMsg.dm_id)
+        .eq('id', message.dm_id)
         .single();
 
-      if (friendRow) {
-        const targets = [friendRow.user_id_1, friendRow.user_id_2];
-        targets.forEach(uid => notifyUser(uid, {
+      if (dm) {
+        const recipients = [dm.user_id_1, dm.user_id_2].filter(id => id !== message.sender_id);
+
+        // Fetch sender info
+        const { data: sender } = await supabase
+          .from('users')
+          .select('username, real_name, avatar_url')
+          .eq('id', message.sender_id)
+          .single();
+
+        broadcastToUsers(recipients, {
           type: 'new_message',
           payload: {
-            dm_id: newMsg.dm_id,
-            message_id: newMsg.id,
-            sender_id: newMsg.sender_id,
-            text: newMsg.text
+            dm_id: message.dm_id,
+            message_id: message.id,
+            sender: sender,
+            text: message.text,
+            image_url: message.image_url,
+            timestamp: message.timestamp
           }
-        }));
-      }
-    })
-    .subscribe((status) => console.log(`[Socket] SUB: messages status - ${status}`));
-
-  // 2. Friend Requests
-  supabase
-    .channel('friend-requests-channel')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friend_requests' }, (payload) => {
-      const newReq = payload.new;
-      if (newReq.status === 'pending') {
-        console.log(`[Socket] NOTIFY: Friend request to ${newReq.to_user_id}`);
-        notifyUser(newReq.to_user_id, {
-          type: 'friend_request',
-          payload: { id: newReq.id, from_user_id: newReq.from_user_id }
         });
       }
     })
     .subscribe();
 
-  // 3. Friends List
+  // Subscribe to friend requests
   supabase
-    .channel('friends-channel')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friends' }, (payload) => {
-      const newFriend = payload.new;
-      const targets = [newFriend.user_id_1, newFriend.user_id_2];
-      targets.forEach(uid => notifyUser(uid, {
-        type: 'friend_accepted',
-        payload: { friendship_id: newFriend.id }
-      }));
+    .channel('friend_requests')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friend_requests' }, async (payload) => {
+      const request = payload.new;
+
+      const { data: fromUser } = await supabase
+        .from('users')
+        .select('username, real_name, avatar_url')
+        .eq('id', request.from_user_id)
+        .single();
+
+      broadcastToUser(request.to_user_id, {
+        type: 'friend_request',
+        payload: {
+          request_id: request.id,
+          from_user: fromUser,
+          created_at: request.created_at
+        }
+      });
     })
     .subscribe();
 
-  // 4. Meetups
+  // Subscribe to friend request updates (accepted)
   supabase
-    .channel('meetups-channel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'meetups' }, (payload) => {
-      const record = payload.new || payload.old;
-      if (!record) return;
-      const targets = [record.requested_by, record.requested_from];
-      const type = payload.eventType === 'INSERT' ? 'meetup_request' : 'meetup_update';
+    .channel('friend_request_updates')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'friend_requests' }, async (payload) => {
+      const request = payload.new;
 
-      targets.forEach(uid => notifyUser(uid, {
-        type,
-        payload: { meetup_id: record.id, status: record.status }
-      }));
+      if (request.status === 'accepted') {
+        const { data: toUser } = await supabase
+          .from('users')
+          .select('username, real_name, avatar_url')
+          .eq('id', request.to_user_id)
+          .single();
+
+        broadcastToUser(request.from_user_id, {
+          type: 'friend_accepted',
+          payload: {
+            user: toUser,
+            created_at: request.created_at
+          }
+        });
+      }
     })
     .subscribe();
-};
 
-handleRealtime();
+  // Subscribe to meetup requests
+  supabase
+    .channel('meetups')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'meetups' }, async (payload) => {
+      const meetup = payload.new;
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Socket] Running on port ${PORT} (0.0.0.0)`);
+      const { data: requester } = await supabase
+        .from('users')
+        .select('username, real_name, avatar_url')
+        .eq('id', meetup.requested_by)
+        .single();
+
+      broadcastToUser(meetup.requested_from, {
+        type: 'meetup_request',
+        payload: {
+          meetup_id: meetup.id,
+          from_user: requester,
+          dm_id: meetup.dm_id,
+          expires_at: meetup.expires_at
+        }
+      });
+    })
+    .subscribe();
+
+  // Subscribe to meetup updates (accepted)
+  supabase
+    .channel('meetup_updates')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'meetups' }, async (payload) => {
+      const meetup = payload.new;
+
+      if (meetup.status === 'accepted' && meetup.location) {
+        broadcastToUser(meetup.requested_by, {
+          type: 'meetup_accepted',
+          payload: {
+            meetup_id: meetup.id,
+            location: meetup.location,
+            dm_id: meetup.dm_id
+          }
+        });
+      }
+    })
+    .subscribe();
+
+  // Subscribe to user statuses
+  supabase
+    .channel('user_statuses')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_statuses' }, async (payload) => {
+      const status = payload.new;
+
+      // Get user's friends
+      const { data: friendships } = await supabase
+        .from('friends')
+        .select('user_id_1, user_id_2')
+        .or(`user_id_1.eq.${status.user_id},user_id_2.eq.${status.user_id}`);
+
+      if (friendships) {
+        const friendIds = friendships.map(f =>
+          f.user_id_1 === status.user_id ? f.user_id_2 : f.user_id_1
+        );
+
+        const { data: user } = await supabase
+          .from('users')
+          .select('username, real_name, avatar_url')
+          .eq('id', status.user_id)
+          .single();
+
+        broadcastToUsers(friendIds, {
+          type: 'status_posted',
+          payload: {
+            status_id: status.id,
+            user: user,
+            type: status.type,
+            created_at: status.created_at
+          }
+        });
+      }
+    })
+    .subscribe();
+
+  // Subscribe to meeting logs
+  supabase
+    .channel('meeting_logs')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'meeting_logs' }, async (payload) => {
+      const log = payload.new;
+
+      // Get meeting creator
+      const { data: meeting } = await supabase
+        .from('meetings')
+        .select('creator_id, channel_id')
+        .eq('id', log.meeting_id)
+        .single();
+
+      if (meeting) {
+        const { data: user } = await supabase
+          .from('users')
+          .select('username, real_name')
+          .eq('id', log.user_id)
+          .single();
+
+        broadcastToUser(meeting.creator_id, {
+          type: 'meeting_update',
+          payload: {
+            meeting_id: log.meeting_id,
+            user: user,
+            event_type: log.type,
+            created_at: log.created_at
+          }
+        });
+      }
+    })
+    .subscribe();
+
+  console.log('[Realtime] Subscriptions setup complete');
+}
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    connections: connections.size,
+    uptime: process.uptime()
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`[Server] WebSocket server running on port ${PORT}`);
+  setupRealtimeSubscriptions();
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('[Server] SIGTERM received, closing connections...');
+  connections.forEach((wsSet) => {
+    wsSet.forEach(ws => ws.close(1000, 'Server shutting down'));
+  });
+  process.exit(0);
 });

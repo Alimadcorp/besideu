@@ -30,7 +30,7 @@ export async function POST(req, { params }) {
     // Get meeting
     const { data: meeting, error: meetingErr } = await supabaseAdmin
       .from('meetings')
-      .select('location, threshold_km, creator_id')
+      .select('location, threshold_km, creator_id, channel_id')
       .eq('id', id)
       .single();
 
@@ -68,6 +68,7 @@ export async function POST(req, { params }) {
     }
 
     // Calculate distance
+    // Calculate distance
     const distance = calculateDistance(
       meeting.location.lat,
       meeting.location.lon,
@@ -76,37 +77,74 @@ export async function POST(req, { params }) {
     );
 
     const isWithinThreshold = distance <= meeting.threshold_km;
+    const now = new Date().toISOString();
 
-    // If within threshold, record arrival (if not already recorded recently, e.g., within last minute)
-    if (isWithinThreshold) {
-      const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    // Get last log to determine current state
+    const { data: lastLog } = await supabaseAdmin
+      .from('meeting_logs')
+      .select('type')
+      .eq('meeting_id', id)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-      // Check if already recorded recently
-      const { data: recentArrival } = await supabaseAdmin
-        .from('meeting_arrivals')
-        .select('id')
-        .eq('meeting_id', id)
-        .eq('user_id', user.id)
-        .gte('arrived_at', oneMinuteAgo)
-        .maybeSingle();
+    const wasInside = lastLog?.type === 'entered';
+    let eventType = null;
 
-      if (!recentArrival) {
-        // Record arrival
-        await supabaseAdmin
-          .from('meeting_arrivals')
-          .insert({
-            meeting_id: id,
-            user_id: user.id,
-            location: { lat, lon },
-            arrived_at: new Date().toISOString(),
-          });
+    if (isWithinThreshold && !wasInside) {
+      eventType = 'entered';
+    } else if (!isWithinThreshold && wasInside) {
+      eventType = 'exited';
+    }
+
+    // specific rule: "stop sharing location after a user has reached."
+    // "Unless, the user leaves, track leaving time."
+    // This implies we DO track them leaving. So we keep sharing internally, but maybe specific visibility rules apply.
+    // We will just log everything for now.
+
+    if (eventType) {
+      await supabaseAdmin
+        .from('meeting_logs')
+        .insert({
+          meeting_id: id,
+          user_id: user.id,
+          type: eventType,
+          location: { lat, lon },
+          distance_km: distance,
+          created_at: now
+        });
+
+      // Send to chat channel if exists
+      if (meeting.channel_id) {
+        const text = eventType === 'entered' ? 'has reached the meeting location.' : 'has left the meeting location.';
+        await supabaseAdmin.from('messages').insert({
+          dm_id: meeting.channel_id,
+          sender_id: user.id,
+          text: text,
+          timestamp: now,
+        });
       }
     }
+
+    // Update live location for creator view (using meeting_invitations or a tracking table)
+    // We'll update meeting_invitations with metadata for current location
+    await supabaseAdmin
+      .from('meeting_invitations')
+      .update({
+        current_lat: lat,
+        current_lon: lon,
+        last_seen_at: now,
+        participation_status: isWithinThreshold ? 'arrived' : 'transit' // 'arrived' inside, 'transit' outside
+      })
+      .eq('meeting_id', id)
+      .eq('invited_user_id', user.id);
 
     return NextResponse.json({
       is_within_threshold: isWithinThreshold,
       distance_km: distance,
       threshold_km: meeting.threshold_km,
+      status: isWithinThreshold ? 'arrived' : 'transit'
     });
   } catch (err) {
     console.error('[meetings/check-arrival] Unexpected error', err);

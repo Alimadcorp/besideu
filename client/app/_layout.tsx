@@ -1,4 +1,5 @@
 import '@/utils/polyfills';
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,7 +15,7 @@ export const unstable_settings = {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isFirstLaunch } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -22,13 +23,20 @@ function RootLayoutNav() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === 'auth';
+    const inIntro = segments[0] === 'intro';
 
-    if (!user && !inAuthGroup) {
-      router.replace('/auth/login');
-    } else if (user && inAuthGroup) {
-      router.replace('/(tabs)');
+    if (isFirstLaunch) {
+      if (!inIntro) router.replace('/intro');
+    } else {
+      if (inIntro) {
+        router.replace(user ? '/(tabs)' : '/auth/login');
+      } else if (!user && !inAuthGroup) {
+        router.replace('/auth/login');
+      } else if (user && inAuthGroup) {
+        router.replace('/(tabs)');
+      }
     }
-  }, [user, isLoading, segments]);
+  }, [user, isLoading, segments, isFirstLaunch]);
 
   if (isLoading) {
     return null;
@@ -39,6 +47,7 @@ function RootLayoutNav() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="intro" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
