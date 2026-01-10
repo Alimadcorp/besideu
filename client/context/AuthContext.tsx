@@ -144,17 +144,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.replace('/auth/login');
     }
 
-    router.replace('/auth/login');
-}
+    const setHasSeenIntro = async () => {
+        await AsyncStorage.setItem('hasSeenIntro', 'true');
+        setIsFirstLaunch(false);
+    }
 
-const setHasSeenIntro = async () => {
-    await AsyncStorage.setItem('hasSeenIntro', 'true');
-    setIsFirstLaunch(false);
-}
-
-return (
-    <AuthContext.Provider value={{ user, isLoading, isFirstLaunch, signIn, signUp, signOut, setHasSeenIntro }}>
-        {children}
-    </AuthContext.Provider>
-);
+    return (
+        <AuthContext.Provider value={{ user, isLoading, isFirstLaunch, signIn, signUp, signOut, setHasSeenIntro }}>
+            {children}
+        </AuthContext.Provider>
+    );
 }
