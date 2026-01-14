@@ -659,7 +659,7 @@ export default function ChatScreen() {
                     }}
                     keyExtractor={(item, index) => item.type === 'date' ? `date-${item.date}` : item.message?.id || `msg-${index}`}
                     inverted
-                    contentContainerStyle={[styles.listContent, { paddingBottom: 120 + keyboardPadding }]}
+                    contentContainerStyle={[styles.listContent, { paddingTop: 140 + keyboardPadding + insets.bottom }]}
                     showsVerticalScrollIndicator={false}
                 />
 

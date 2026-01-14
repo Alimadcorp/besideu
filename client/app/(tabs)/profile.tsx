@@ -579,6 +579,17 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 </View>
 
+                {/* Business Tools */}
+                {user?.is_business && (
+                    <View style={styles.section}>
+                        <ThemedText type="subtitle" style={styles.sectionTitle}>Business Tools</ThemedText>
+                        <TouchableOpacity style={[styles.row, { borderBottomColor: theme.icon }]} onPress={() => router.push('/meetings/create')}>
+                            <ThemedText style={styles.rowLabel}>Create New Meeting</ThemedText>
+                            <IconSymbol name="calendar.badge.plus" size={20} color={theme.tint} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 {/* Info Section */}
                 <View style={styles.section}>
                     <ThemedText type="subtitle" style={styles.sectionTitle}>About</ThemedText>
@@ -603,17 +614,6 @@ export default function ProfileScreen() {
                         <ThemedText style={styles.rowValue}>Muhammad Ali</ThemedText>
                     </View> */}
                 </View>
-
-                {/* Business Tools */}
-                {user?.is_business && false && (
-                    <View style={styles.section}>
-                        <ThemedText type="subtitle" style={styles.sectionTitle}>Business Tools</ThemedText>
-                        <TouchableOpacity style={[styles.row, { borderBottomColor: theme.icon }]} onPress={() => router.push('/meetings/create')}>
-                            <ThemedText style={styles.rowLabel}>Create New Meeting</ThemedText>
-                            <IconSymbol name="calendar.badge.plus" size={20} color={theme.tint} />
-                        </TouchableOpacity>
-                    </View>
-                )}
 
                 {/* Logout */}
                 <TouchableOpacity style={[styles.logoutButton, { borderColor: 'red' }]} onPress={handleLogout}>

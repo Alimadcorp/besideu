@@ -1,7 +1,7 @@
-import { StyleSheet, View, TextInput, TouchableOpacity, Alert, Platform, Keyboard, KeyboardAvoidingView, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, Alert, Platform, Keyboard, ActivityIndicator, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,11 +22,45 @@ export default function CreateStatusScreen() {
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [backgroundColor, setBackgroundColor] = useState(COLORS[7]); // Default black
     const [uploading, setUploading] = useState(false);
+    const keyboardHeight = useRef(new Animated.Value(0)).current;
+    const [keyboardPadding, setKeyboardPadding] = useState(0);
 
     // Scheduling
     const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
+
+    // Keyboard listeners
+    useEffect(() => {
+        const keyboardWillShow = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            (e) => {
+                Animated.timing(keyboardHeight, {
+                    duration: Platform.OS === 'ios' ? e.duration : 250,
+                    toValue: e.endCoordinates.height,
+                    useNativeDriver: false,
+                }).start();
+                setKeyboardPadding(e.endCoordinates.height);
+            }
+        );
+
+        const keyboardWillHide = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            (e) => {
+                Animated.timing(keyboardHeight, {
+                    duration: Platform.OS === 'ios' ? e.duration : 250,
+                    toValue: 0,
+                    useNativeDriver: false,
+                }).start();
+                setKeyboardPadding(0);
+            }
+        );
+
+        return () => {
+            keyboardWillShow.remove();
+            keyboardWillHide.remove();
+        };
+    }, [keyboardHeight]);
 
     const pickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -80,8 +114,7 @@ export default function CreateStatusScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <View
             style={[styles.container, { backgroundColor: imageUri ? 'black' : backgroundColor }]}
         >
             {/* Header */}
@@ -106,7 +139,7 @@ export default function CreateStatusScreen() {
             </View>
 
             {/* Content Preview */}
-            <View style={styles.content}>
+            <View style={[styles.content, { paddingBottom: 100 + keyboardPadding }]}>
                 {imageUri ? (
                     <Image source={{ uri: imageUri }} style={styles.previewImage} contentFit="contain" />
                 ) : (
@@ -136,7 +169,16 @@ export default function CreateStatusScreen() {
             </View>
 
             {/* Footer */}
-            <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+            <Animated.View style={[
+                styles.footer,
+                {
+                    paddingBottom: insets.bottom + (Platform.OS === 'ios' ? 0 : 20),
+                    position: 'absolute',
+                    bottom: keyboardHeight,
+                    left: 0,
+                    right: 0,
+                }
+            ]}>
                 {/* Image Picker */}
                 {!imageUri && (
                     <TouchableOpacity onPress={pickImage} style={styles.mediaBtn}>
@@ -157,7 +199,7 @@ export default function CreateStatusScreen() {
                         <IconSymbol name="paperplane.fill" size={24} color="white" />
                     )}
                 </TouchableOpacity>
-            </View>
+            </Animated.View>
 
             {/* Schedulers */}
             {showDatePicker && (
@@ -196,7 +238,7 @@ export default function CreateStatusScreen() {
                 />
             )}
 
-        </KeyboardAvoidingView>
+        </View>
     );
 }
 
