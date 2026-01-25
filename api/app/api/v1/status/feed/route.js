@@ -11,18 +11,30 @@ export async function GET(req) {
     try {
         const now = new Date().toISOString();
 
-        // 1. Get friend IDs
-        const { data: friends, error: friendError } = await supabaseAdmin
-            .from('friends')
-            .select('user_id_1, user_id_2')
-            .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`);
+        // 1. Get friend IDs (fetch both sides in parallel)
+        const [friends1Result, friends2Result] = await Promise.all([
+            supabaseAdmin
+                .from('friends')
+                .select('user_id_1, user_id_2')
+                .eq('user_id_1', user.id),
+            supabaseAdmin
+                .from('friends')
+                .select('user_id_1, user_id_2')
+                .eq('user_id_2', user.id)
+        ]);
 
-        if (friendError) {
-            console.error('[status/feed] friend fetch error', friendError);
-            throw friendError;
+        const { data: friends1, error: friendError1 } = friends1Result;
+        const { data: friends2, error: friendError2 } = friends2Result;
+
+        if (friendError1 || friendError2) {
+            console.error('[status/feed] friend fetch error', friendError1 || friendError2);
+            throw friendError1 || friendError2;
         }
 
-        const friendIds = friends.map(f => f.user_id_1 === user.id ? f.user_id_2 : f.user_id_1);
+        const friendIds = [
+            ...(friends1 || []).map(f => f.user_id_2),
+            ...(friends2 || []).map(f => f.user_id_1)
+        ];
 
         if (friendIds.length === 0) {
             return NextResponse.json({ feed: [] });
