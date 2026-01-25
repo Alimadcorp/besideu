@@ -22,10 +22,10 @@ export async function GET(req) {
       ? Number(rangeParam)
       : null;
 
-    // Fetch current user's location hashes
+    // Fetch current user's 3km location hash
     const { data: locationRow, error: locErr } = await supabaseAdmin
       .from('user_locations')
-      .select('location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km')
+      .select('location_hash_3km')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -37,49 +37,66 @@ export async function GET(req) {
       );
     }
 
-    if (!locationRow?.location_hash_100m || !locationRow?.location_hash_500m || !locationRow?.location_hash_1km || !locationRow?.location_hash_3km || !locationRow?.location_hash_5km) {
+    if (!locationRow?.location_hash_3km) {
       return NextResponse.json(
         { error: 'Current user location not set', code: 'location_not_set' },
         { status: 400 },
       );
     }
 
-    const myHashes = {
-      hash_100m: locationRow.location_hash_100m,
-      hash_500m: locationRow.location_hash_500m,
-      hash_1km: locationRow.location_hash_1km,
-      hash_3km: locationRow.location_hash_3km,
-      hash_5km: locationRow.location_hash_5km,
-    };
+    const myHash3km = locationRow.location_hash_3km;
 
-    // 1. Fetch current user's accepted friends IDs
-    const { data: friendRows, error: friendErr } = await supabaseAdmin
-      .from('friends')
-      .select('user_id_1, user_id_2')
-      .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`);
+    // Optimize: Fetch friends and nearby users in parallel
+    const [friendResult, candidatesResult] = await Promise.all([
+      // 1. Fetch current user's accepted friends IDs
+      supabaseAdmin
+        .from('friends')
+        .select('user_id_1, user_id_2')
+        .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`),
+      
+      // 2. Fetch users with 3km location hash match (business users first, we'll add friends)
+      supabaseAdmin
+        .from('user_locations')
+        .select('user_id, updated_at, location_hash_3km, users!inner ( username, real_name, preferences, avatar_url, is_online, last_online, is_business )')
+        .neq('user_id', user.id)
+        .eq('location_hash_3km', myHash3km)
+        .eq('users.is_business', true)
+    ]);
+
+    const { data: friendRows, error: friendErr } = friendResult;
+    const { data: businessCandidates, error: businessErr } = candidatesResult;
 
     if (friendErr) {
       console.error('[location/find] Error fetching friends', friendErr);
       return NextResponse.json({ error: 'Internal error', code: 'supabase_error' }, { status: 500 });
     }
 
+    if (businessErr) {
+      console.error('[location/find] Error fetching business users', businessErr);
+    }
+
     const friendIds = (friendRows || []).map(row =>
       row.user_id_1 === user.id ? row.user_id_2 : row.user_id_1
     );
 
-    if (friendIds.length === 0) {
-      return NextResponse.json({
-        users: [],
-        pagination: { page: 1, page_size: pageSizeParam || 50, total: 0 }
-      });
-    }
+    // Fetch friend locations if we have friends
+    let allCandidates = businessCandidates || [];
+    if (friendIds.length > 0) {
+      const { data: friendLocations, error: friendLocErr } = await supabaseAdmin
+        .from('user_locations')
+        .select('user_id, updated_at, location_hash_3km, users!inner ( username, real_name, preferences, avatar_url, is_online, last_online, is_business )')
+        .neq('user_id', user.id)
+        .eq('location_hash_3km', myHash3km)
+        .in('user_id', friendIds);
 
-    // 2. Fetch friends with location data (fetch all friends, we'll filter by hash match in memory)
-    const { data: candidates, error: candidatesErr } = await supabaseAdmin
-      .from('user_locations')
-      .select('user_id, updated_at, location_hash_100m, location_hash_500m, location_hash_1km, location_hash_3km, location_hash_5km, users!inner ( username, real_name, preferences, avatar_url, is_online, last_online )')
-      .neq('user_id', user.id)
-      .in('user_id', friendIds);
+      if (!friendLocErr && friendLocations) {
+        // Merge and deduplicate by user_id
+        const candidateMap = new Map();
+        allCandidates.forEach(c => candidateMap.set(c.user_id, c));
+        friendLocations.forEach(f => candidateMap.set(f.user_id, f));
+        allCandidates = Array.from(candidateMap.values());
+      }
+    }
 
     if (candidatesErr) {
       console.error('[location/find] Error fetching nearby users', candidatesErr);
@@ -91,42 +108,25 @@ export async function GET(req) {
 
     const users = [];
 
-    for (const row of candidates || []) {
+    for (const row of allCandidates) {
       // Filter out users who disabled location sharing
       if (row.users?.preferences?.share_location === false) continue;
 
-      // Determine distance tier based on which hash matches (check from smallest to largest)
-      // If hash_100m matches -> beside_you (100m)
-      // Else if hash_500m matches -> very_near (500m)
-      // Else if hash_1km matches -> near (1km)
-      // Else if hash_3km matches -> far (3km)
-      // Else if hash_5km matches -> very_far (5km)
-      // If none match, skip this user (they're not nearby)
-      let distance = null;
-      if (row.location_hash_100m === myHashes.hash_100m) {
-        distance = 'beside_you';
-      } else if (row.location_hash_500m === myHashes.hash_500m) {
-        distance = 'very_near';
-      } else if (row.location_hash_1km === myHashes.hash_1km) {
-        distance = 'near';
-      } else if (row.location_hash_3km === myHashes.hash_3km) {
-        distance = 'far';
-      } else if (row.location_hash_5km === myHashes.hash_5km) {
-        distance = 'very_far';
-      } else {
-        // No hash matches, user is outside 5km radius
-        continue;
-      }
-
+      // All users in this list are within 3km (since we filtered by hash match)
+      const isFriend = friendIds.includes(row.user_id);
+      const isBusiness = row.users?.is_business === true;
+      
       users.push({
         id: row.user_id,
         username: row.users?.username || null,
         real_name: row.users?.real_name || null,
         avatar_url: row.users?.avatar_url || null,
-        distance,
+        distance: 'near', // All are within 3km
         is_online: row.users?.is_online || false,
         last_online: row.users?.last_online || null,
         location_shared_at: row.updated_at,
+        is_business: isBusiness,
+        is_friend: isFriend,
       });
     }
 

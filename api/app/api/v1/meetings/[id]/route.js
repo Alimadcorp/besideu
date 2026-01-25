@@ -54,7 +54,7 @@ export async function GET(req, { params }) {
     if (isCreator) {
       const { data: l } = await supabaseAdmin
         .from('meeting_logs')
-        .select('user_id, type, created_at, location, users(id, username, real_name, avatar_url)')
+        .select('user_id, type, created_at, location, distance_km, users(id, username, real_name, avatar_url)')
         .eq('meeting_id', id)
         .order('created_at', { ascending: false });
 

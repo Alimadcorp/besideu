@@ -14,16 +14,15 @@ export async function GET(req) {
         // 1. Get friend IDs
         const { data: friends, error: friendError } = await supabaseAdmin
             .from('friends')
-            .select('friend_id, user_id')
-            .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`)
-            .eq('status', 'accepted');
+            .select('user_id_1, user_id_2')
+            .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`);
 
         if (friendError) {
             console.error('[status/feed] friend fetch error', friendError);
             throw friendError;
         }
 
-        const friendIds = friends.map(f => f.user_id === user.id ? f.friend_id : f.user_id);
+        const friendIds = friends.map(f => f.user_id_1 === user.id ? f.user_id_2 : f.user_id_1);
 
         if (friendIds.length === 0) {
             return NextResponse.json({ feed: [] });
@@ -35,7 +34,7 @@ export async function GET(req) {
             .from('user_statuses')
             .select(`
                 *,
-                user:users(id, username, real_name, avatar_url)
+                users!inner(id, username, real_name, avatar_url)
             `)
             .in('user_id', friendIds)
             .gt('expires_at', now)
@@ -63,6 +62,7 @@ export async function GET(req) {
 
         const feed = statuses.map(s => ({
             ...s,
+            user: s.users,
             viewed: viewedStatusIds.has(s.id)
         }));
 

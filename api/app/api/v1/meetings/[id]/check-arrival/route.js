@@ -118,8 +118,8 @@ export async function POST(req, { params }) {
       // Send to chat channel if exists
       if (meeting.channel_id) {
         const text = eventType === 'entered' ? 'has reached the meeting location.' : 'has left the meeting location.';
-        await supabaseAdmin.from('messages').insert({
-          dm_id: meeting.channel_id,
+        await supabaseAdmin.from('meeting_channel_messages').insert({
+          channel_id: meeting.channel_id,
           sender_id: user.id,
           text: text,
           timestamp: now,

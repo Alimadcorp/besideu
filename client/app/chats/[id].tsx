@@ -1,7 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, View, TextInput, FlatList, Platform, TouchableOpacity, ActivityIndicator, Alert, Linking, Modal, Keyboard, Animated } from 'react-native';
-import { formatDistanceToNow, format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as Location from 'expo-location';
@@ -169,10 +169,6 @@ export default function ChatScreen() {
             removeListener();
             clearInterval(profileInterval);
         };
-        return () => {
-            removeListener();
-            clearInterval(profileInterval);
-        };
     }, [fetchMessages, id, markAsRead, chatUser?.id, fetchUserProfile]);
 
     // Active Meetup Location Tracking
@@ -248,27 +244,55 @@ export default function ChatScreen() {
         setSending(true);
 
         try {
-            const response = await apiRequest(`/v1/messages/${id}/send`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    text: textToSend,
-                    image_url: imageUrl,
-                    timestamp: new Date().toISOString(),
-                    scheduled_at: scheduledAt,
-                }),
-            });
+            // Handle meeting channel messages differently
+            if (type === 'meeting') {
+                const meetingId = (chatUser as any)?.meeting_id;
+                if (!meetingId) {
+                    throw new Error('Meeting ID not found');
+                }
+                
+                const response = await apiRequest(`/v1/meetings/${meetingId}/channel/messages`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        text: textToSend,
+                        image_url: imageUrl,
+                    }),
+                });
 
-            if (scheduledAt) {
-                Alert.alert('Scheduled', 'Your message will be sent at ' + new Date(scheduledAt).toLocaleString());
+                if (response.success && response.message) {
+                    const newMessage: Message = {
+                        id: response.message.id,
+                        text: textToSend,
+                        image_url: imageUrl,
+                        sender_id: user!.id,
+                        timestamp: response.message.timestamp,
+                    };
+                    setMessages(prev => [newMessage, ...prev]);
+                }
             } else {
-                const newMessage: Message = {
-                    id: response.message_id,
-                    text: textToSend,
-                    image_url: imageUrl,
-                    sender_id: user!.id,
-                    timestamp: response.timestamp,
-                };
-                setMessages(prev => [newMessage, ...prev]);
+                // Regular DM message
+                const response = await apiRequest(`/v1/messages/${id}/send`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        text: textToSend,
+                        image_url: imageUrl,
+                        timestamp: new Date().toISOString(),
+                        scheduled_at: scheduledAt,
+                    }),
+                });
+
+                if (scheduledAt) {
+                    Alert.alert('Scheduled', 'Your message will be sent at ' + new Date(scheduledAt).toLocaleString());
+                } else {
+                    const newMessage: Message = {
+                        id: response.message_id,
+                        text: textToSend,
+                        image_url: imageUrl,
+                        sender_id: user!.id,
+                        timestamp: response.timestamp,
+                    };
+                    setMessages(prev => [newMessage, ...prev]);
+                }
             }
         } catch (error: any) {
             console.error('Failed to send message:', error);

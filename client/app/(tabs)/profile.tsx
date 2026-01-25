@@ -36,7 +36,6 @@ export default function ProfileScreen() {
     const [saving, setSaving] = useState(false);
     const [profile, setProfile] = useState<any>(null);
     const [locationEnabled, setLocationEnabled] = useState(true);
-    const [range, setRange] = useState(5);
     const [resendCooldown, setResendCooldown] = useState(0);
 
     useEffect(() => {
@@ -59,7 +58,6 @@ export default function ProfileScreen() {
             setProfile(data.user);
             const prefs = data.user.preferences || {};
             setLocationEnabled(prefs.share_location !== false);
-            setRange(prefs.range || 5);
         } catch (error) {
             console.error('Failed to fetch profile', error);
         } finally {
@@ -87,13 +85,8 @@ export default function ProfileScreen() {
 
     const toggleLocation = (value: boolean) => {
         setLocationEnabled(value);
-        updateProfile({ preferences: { range, share_location: value } });
+        updateProfile({ preferences: { share_location: value } });
     };
-
-    const updateRange = (newRange: number) => {
-        setRange(newRange);
-        updateProfile({ preferences: { range: newRange, share_location: locationEnabled } });
-    }
 
     const handleLogout = async () => {
         Alert.alert(
@@ -526,36 +519,16 @@ export default function ProfileScreen() {
                     <ThemedText type="subtitle" style={styles.sectionTitle}>Preferences</ThemedText>
 
                     <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
-                        <ThemedText style={styles.rowLabel}>Share Location</ThemedText>
+                        <View>
+                            <ThemedText style={styles.rowLabel}>Share Location</ThemedText>
+                            <ThemedText style={styles.rowSubtext}>Show your location to friends within 3km</ThemedText>
+                        </View>
                         <Switch
                             value={locationEnabled}
                             onValueChange={toggleLocation}
                             trackColor={{ false: '#767577', true: theme.tint }}
                             disabled={saving}
                         />
-                    </View>
-
-                    <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
-                        <View>
-                            <ThemedText style={styles.rowLabel}>Discovery Radius</ThemedText>
-                            <ThemedText style={styles.rowSubtext}>{range} km</ThemedText>
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 15, alignItems: 'center' }}>
-                            <TouchableOpacity
-                                onPress={() => updateRange(Math.max(1, range - 1))}
-                                disabled={saving}
-                                style={[styles.rangeBtn, { backgroundColor: theme.icon + '20' }]}
-                            >
-                                <ThemedText style={styles.rangeBtnText}>-</ThemedText>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => updateRange(Math.min(50, range + 1))}
-                                disabled={saving}
-                                style={[styles.rangeBtn, { backgroundColor: theme.icon + '20' }]}
-                            >
-                                <ThemedText style={styles.rangeBtnText}>+</ThemedText>
-                            </TouchableOpacity>
-                        </View>
                     </View>
                 </View>
 
@@ -605,14 +578,16 @@ export default function ProfileScreen() {
                     </View>
 
                     <View style={[styles.row, { borderBottomColor: theme.icon }]}>
-                        <ThemedText style={styles.rowLabel}>An app by</ThemedText>
-                        <ThemedText style={styles.rowValue}>Habeebullah Wattoo</ThemedText>
+                        <ThemedText style={styles.rowLabel}>Built by Ravians</ThemedText>
+                        <ThemedText style={[styles.rowValue, { fontSize: 12, textAlign: 'right', flex: 1 }]}>
+                            Students of GCU Lahore{'\n'}for Ravians with love
+                        </ThemedText>
                     </View>
 
-                    {/* <View style={[styles.row, { borderBottomColor: theme.icon }]}>
-                        <ThemedText style={styles.rowLabel}>Developed by</ThemedText>
+                    <View style={[styles.row, { borderBottomColor: theme.icon }]}>
+                        <ThemedText style={styles.rowLabel}>Developer</ThemedText>
                         <ThemedText style={styles.rowValue}>Muhammad Ali</ThemedText>
-                    </View> */}
+                    </View>
                 </View>
 
                 {/* Logout */}
@@ -1037,17 +1012,6 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         opacity: 0.5,
         textAlign: 'center',
-    },
-    rangeBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    rangeBtnText: {
-        fontSize: 20,
-        fontWeight: 'bold',
     },
     modalOverlay: {
         flex: 1,

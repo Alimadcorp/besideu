@@ -53,8 +53,11 @@ export default function StatusScreen() {
     const groupedFeed = React.useMemo(() => {
         const groups: Record<string, any[]> = {};
         feed.forEach(s => {
-            if (!groups[s.user_id]) groups[s.user_id] = [];
-            groups[s.user_id].push(s);
+            const userId = s.user_id || s.user?.id;
+            if (userId) {
+                if (!groups[userId]) groups[userId] = [];
+                groups[userId].push(s);
+            }
         });
         return Object.values(groups);
     }, [feed]);
@@ -112,26 +115,27 @@ export default function StatusScreen() {
                 </View>
             ) : (
                 groupedFeed.map((userStatuses: any[]) => {
-                    const statusUser = userStatuses[0].user;
+                    const statusUser = userStatuses[0].user || {};
+                    const userId = userStatuses[0].user_id || statusUser.id;
                     const hasUnviewed = userStatuses.some(s => !s.viewed);
                     return (
                         <TouchableOpacity
-                            key={statusUser.id}
+                            key={userId}
                             style={styles.statusRow}
-                            onPress={() => router.push({ pathname: '/status/view' as any, params: { userId: statusUser.id } })}
+                            onPress={() => router.push({ pathname: '/status/view' as any, params: { userId } })}
                         >
                             <View style={[
                                 styles.ringContainer,
                                 hasUnviewed ? { borderColor: theme.tint } : { borderColor: theme.icon + '30' }
                             ]}>
                                 <Image
-                                    source={{ uri: statusUser.avatar_url }}
+                                    source={{ uri: statusUser.avatar_url || 'https://via.placeholder.com/150' }}
                                     style={styles.feedAvatar}
                                     contentFit="cover"
                                 />
                             </View>
                             <View style={styles.statusInfo}>
-                                <ThemedText type="defaultSemiBold">{statusUser.real_name || statusUser.username}</ThemedText>
+                                <ThemedText type="defaultSemiBold">{statusUser.real_name || statusUser.username || 'Unknown'}</ThemedText>
                                 <ThemedText style={{ opacity: 0.6, fontSize: 13 }}>
                                     {new Date(userStatuses[0].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     • {userStatuses.length} updates

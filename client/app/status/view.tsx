@@ -52,14 +52,13 @@ export default function ViewStatusScreen() {
                 // Helper to format 'me' statuses to match feed structure roughly
                 const myFormatted = (me.statuses || []).map((s: any) => ({
                     ...s,
-                    user: {
+                    user: s.user || {
                         id: s.user_id,
-                        // We might not have full user details in 'me' response, but UI can handle missing avatar or load from cache/context if needed. 
-                        // For now we assume simplistic placeholders if missing.
                         username: 'Me',
                         real_name: 'Me',
                         avatar_url: ''
-                    }
+                    },
+                    user_id: s.user_id
                 }));
 
                 const all = [...myFormatted, ...(feed.feed || [])];

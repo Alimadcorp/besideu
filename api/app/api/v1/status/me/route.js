@@ -14,7 +14,7 @@ export async function GET(req) {
         // Fetch active statuses (not expired) and also future scheduled ones
         const { data, error } = await supabaseAdmin
             .from('user_statuses')
-            .select('*')
+            .select('*, users!inner(id, username, real_name, avatar_url)')
             .eq('user_id', user.id)
             .gt('expires_at', now)
             .order('created_at', { ascending: false });
@@ -44,7 +44,14 @@ export async function GET(req) {
             }
         }
 
-        return NextResponse.json({ statuses: data });
+        // Format response with user info
+        const formattedStatuses = data.map(s => ({
+            ...s,
+            user: s.users || { id: user.id, username: user.username, real_name: user.real_name, avatar_url: user.avatar_url },
+            user_id: user.id
+        }));
+
+        return NextResponse.json({ statuses: formattedStatuses });
     } catch (err) {
         console.error('[status/me] unexpected', err);
         return NextResponse.json({ error: 'Unexpected error', code: 'internal_error' }, { status: 500 });

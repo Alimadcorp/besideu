@@ -1,12 +1,10 @@
-import { useRef, useCallback } from 'react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { formatDistanceToNow } from 'date-fns';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -18,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 import { LOCATION_TASK_NAME } from '@/utils/background-location';
+import { useRouter } from 'expo-router';
 
 type NearbyUser = {
   id: string;
@@ -28,6 +27,8 @@ type NearbyUser = {
   is_online?: boolean;
   last_online?: string;
   location_shared_at?: string;
+  is_business?: boolean;
+  is_friend?: boolean;
 };
 
 export default function NearbyScreen() {
@@ -35,6 +36,7 @@ export default function NearbyScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [locationPermission, setLocationPermission] = useState<Location.PermissionStatus | null>(null);
+  const [status, setStatus] = useState<'idle' | 'getting_location' | 'updating_location' | 'fetching_users' | 'ready'>('idle');
 
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -44,32 +46,29 @@ export default function NearbyScreen() {
 
   const fetchNearbyUsers = useCallback(async () => {
     try {
+      setStatus('getting_location');
       const location = await Location.getCurrentPositionAsync({});
       const hashes = hashLocationAll(location.coords.latitude, location.coords.longitude);
 
-      // Update our location first with all five hashes
+      setStatus('updating_location');
+      // Update our location first with 3km hash only
       await apiRequest('/v1/location/set', {
         method: 'PUT',
         body: JSON.stringify({
-          location_hash_100m: hashes.location_hash_100m,
-          location_hash_500m: hashes.location_hash_500m,
-          location_hash_1km: hashes.location_hash_1km,
           location_hash_3km: hashes.location_hash_3km,
-          location_hash_5km: hashes.location_hash_5km,
           timestamp: new Date().toISOString(),
         }),
       });
 
-      // Get user preference for range
-      const profileData = await apiRequest('/v1/user/me');
-      const preferredRange = profileData.user?.preferences?.range || 5;
-
-      // Find nearby
-      const data = await apiRequest(`/v1/location/find?range=${preferredRange}`);
+      setStatus('fetching_users');
+      // Find nearby (only 3km range)
+      const data = await apiRequest('/v1/location/find');
       setNearbyUsers(data.users);
+      setStatus('ready');
     } catch (error) {
       console.error('Failed to fetch nearby users:', error);
       Alert.alert('Error', 'Could not fetch nearby users.');
+      setStatus('ready');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -159,7 +158,28 @@ export default function NearbyScreen() {
                   'Very far'}
         </ThemedText>
       </TouchableOpacity>
-      {['beside_you', 'very_near', 'near', 'far', 'very_far'].includes(item.distance) ? (
+      {item.is_business && !item.is_friend ? (
+        // Business user, not a friend - show chat only
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: theme.tint }]}
+          onPress={async () => {
+            try {
+              const chatsData = await apiRequest('/v1/messages/list');
+              const existingChat = chatsData.dms?.find((dm: any) => dm.user_id === item.id);
+              if (existingChat) {
+                router.push(`/chats/${existingChat.id}` as any);
+              } else {
+                router.push(`/user/${item.id}` as any);
+              }
+            } catch (e) {
+              router.push(`/chats` as any);
+            }
+          }}
+        >
+          <IconSymbol name="message.fill" size={20} color="white" />
+        </TouchableOpacity>
+      ) : item.is_friend && ['beside_you', 'very_near', 'near', 'far', 'very_far'].includes(item.distance) ? (
+        // Friend in range - show meetup option
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: theme.tint }]}
           onPress={async () => {
@@ -182,6 +202,7 @@ export default function NearbyScreen() {
           <IconSymbol name="location.circle.fill" size={20} color="white" />
         </TouchableOpacity>
       ) : (
+        // Friend not in range or other case - show chat
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: theme.tint }]}
           onPress={async () => {
@@ -217,8 +238,16 @@ export default function NearbyScreen() {
             <ThemedText style={{ color: 'white' }}>Grant Permission</ThemedText>
           </TouchableOpacity>
         </View>
-      ) : loading ? (
-        <ActivityIndicator size="large" color={theme.tint} style={{ marginTop: 20 }} />
+      ) : loading || status !== 'ready' ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.tint} style={{ marginBottom: 10 }} />
+          <ThemedText style={{ opacity: 0.7 }}>
+            {status === 'getting_location' ? 'Getting your location...' :
+             status === 'updating_location' ? 'Updating location...' :
+             status === 'fetching_users' ? 'Finding nearby friends...' :
+             'Loading...'}
+          </ThemedText>
+        </View>
       ) : (
         <FlatList
           data={nearbyUsers}
@@ -323,5 +352,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
   }
 });

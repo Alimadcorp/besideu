@@ -106,26 +106,62 @@ export async function POST(req) {
 
     // Create invitations if user_ids provided
     if (invite_user_ids && Array.isArray(invite_user_ids) && invite_user_ids.length > 0) {
-      // Verify all users are friends
-      const [u1, u2] = invite_user_ids.map((invitedId) => {
-        const [id1, id2] = user.id < invitedId ? [user.id, invitedId] : [invitedId, user.id];
-        return { id1, id2 };
-      });
+      // Verify all users are friends - check each one individually
+      const validFriendIds = new Set();
+      
+      for (const invitedId of invite_user_ids) {
+        const id1 = user.id < invitedId ? user.id : invitedId;
+        const id2 = user.id < invitedId ? invitedId : user.id;
+        
+        const { data: friendship } = await supabaseAdmin
+          .from('friends')
+          .select('user_id_1, user_id_2')
+          .eq('user_id_1', id1)
+          .eq('user_id_2', id2)
+          .maybeSingle();
+        
+        if (friendship) {
+          validFriendIds.add(invitedId);
+        }
+      }
 
-      // Check friendships
-      const invitations = invite_user_ids.map((invitedId) => ({
-        meeting_id: meeting.id,
-        invited_user_id: invitedId,
-        status: 'pending',
-      }));
+      // Only invite users who are actually friends
+      const validInviteIds = invite_user_ids.filter(id => validFriendIds.has(id));
 
-      const { error: inviteErr } = await supabaseAdmin
-        .from('meeting_invitations')
-        .insert(invitations);
+      if (validInviteIds.length > 0) {
+        const invitations = validInviteIds.map((invitedId) => ({
+          meeting_id: meeting.id,
+          invited_user_id: invitedId,
+          status: 'pending',
+        }));
 
-      if (inviteErr) {
-        console.error('[meetings/create] Failed to create invitations', inviteErr);
-        // Don't fail the whole request, just log the error
+        const { error: inviteErr } = await supabaseAdmin
+          .from('meeting_invitations')
+          .insert(invitations);
+
+        if (inviteErr) {
+          console.error('[meetings/create] Failed to create invitations', inviteErr);
+          // Don't fail the whole request, just log the error
+        }
+
+        // Send push notifications to invited users
+        try {
+          const { sendPushNotifications } = await import('@/lib/pushNotifications');
+          const { data: creatorInfo } = await supabaseAdmin
+            .from('users')
+            .select('real_name, username')
+            .eq('id', user.id)
+            .single();
+
+          const creatorName = creatorInfo?.real_name || creatorInfo?.username || 'Someone';
+          await sendPushNotifications(validInviteIds, {
+            title: 'Meeting Invitation',
+            body: `${creatorName} invited you to "${title}"`,
+            data: { type: 'meeting_invitation', meeting_id: meeting.id }
+          });
+        } catch (notifErr) {
+          console.error('[meetings/create] Failed to send notifications', notifErr);
+        }
       }
     }
 
