@@ -26,6 +26,7 @@ const MAPPING = {
   'envelope': 'mail',
   'plus': 'add',
   'arrow.up.circle.fill': 'arrow-circle-up',
+  'arrow.clockwise': 'refresh',
   'checkmark': 'check',
   'checkmark.circle.fill': 'check-circle',
   'xmark': 'close',

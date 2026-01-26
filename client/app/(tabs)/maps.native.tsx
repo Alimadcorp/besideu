@@ -229,6 +229,19 @@ export default function NearbyScreen() {
     <ThemedView style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <ThemedText type="title">Nearby</ThemedText>
+        {locationPermission && status === 'ready' && (
+          <TouchableOpacity
+            onPress={onRefresh}
+            style={styles.reloadButton}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={theme.tint} />
+            ) : (
+              <IconSymbol name="arrow.clockwise" size={22} color={theme.tint} />
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {!locationPermission ? (
@@ -243,9 +256,9 @@ export default function NearbyScreen() {
           <ActivityIndicator size="large" color={theme.tint} style={{ marginBottom: 10 }} />
           <ThemedText style={{ opacity: 0.7 }}>
             {status === 'getting_location' ? 'Getting your location...' :
-             status === 'updating_location' ? 'Updating location...' :
-             status === 'fetching_users' ? 'Finding nearby friends...' :
-             'Loading...'}
+              status === 'updating_location' ? 'Updating location...' :
+                status === 'fetching_users' ? 'Finding nearby friends...' :
+                  'Loading...'}
           </ThemedText>
         </View>
       ) : (
@@ -289,6 +302,16 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reloadButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userItem: {
     flexDirection: 'row',

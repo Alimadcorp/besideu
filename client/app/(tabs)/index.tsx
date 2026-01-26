@@ -13,7 +13,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiRequest } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
 import { Image } from 'expo-image';
-import { startBackgroundUpdater, stopBackgroundUpdater } from '@/utils/background-updater';
 
 type DM = {
   id: string;
@@ -31,7 +30,7 @@ type DM = {
 
 import { addSocketListener } from '@/utils/socket';
 
-const formatChatTime = (ts) => {
+const formatChatTime = (ts: string) => {
   const date = new Date(ts);
   const now = new Date();
 
@@ -88,11 +87,6 @@ export default function ChatsScreen() {
 
     fetchChats();
 
-    // Start background updater (fetches chats every 30s, location every 1min)
-    startBackgroundUpdater((chats) => {
-      setDms(chats || []);
-    });
-
     const removeListener = addSocketListener((msg) => {
       if (msg.type === 'new_message') {
         // efficient: could just update the specific item if payload allows, 
@@ -109,7 +103,6 @@ export default function ChatsScreen() {
     });
 
     return () => {
-      stopBackgroundUpdater();
       removeListener();
       subscription.remove();
     };

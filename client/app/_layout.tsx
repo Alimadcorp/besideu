@@ -54,13 +54,15 @@ function RootLayoutNav() {
   );
 }
 
-import { registerBackgroundFetchAsync, requestNotificationPermissions } from '@/utils/background-location';
+import { requestNotificationPermissions } from '@/utils/background-location';
+import { checkForUpdates } from '@/utils/updates';
 
 export default function RootLayout() {
   useEffect(() => {
     (async () => {
       await requestNotificationPermissions();
-      await registerBackgroundFetchAsync();
+      // Check for app updates automatically
+      await checkForUpdates();
     })();
   }, []);
 

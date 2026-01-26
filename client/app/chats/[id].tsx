@@ -250,7 +250,7 @@ export default function ChatScreen() {
                 if (!meetingId) {
                     throw new Error('Meeting ID not found');
                 }
-                
+
                 const response = await apiRequest(`/v1/meetings/${meetingId}/channel/messages`, {
                     method: 'POST',
                     body: JSON.stringify({
@@ -683,7 +683,7 @@ export default function ChatScreen() {
                     }}
                     keyExtractor={(item, index) => item.type === 'date' ? `date-${item.date}` : item.message?.id || `msg-${index}`}
                     inverted
-                    contentContainerStyle={[styles.listContent, { paddingTop: 140 + keyboardPadding + insets.bottom }]}
+                    contentContainerStyle={[styles.listContent, { paddingTop: 20 + keyboardPadding }]}
                     showsVerticalScrollIndicator={false}
                 />
 
@@ -847,12 +847,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     listContent: {
-        padding: 15,
-        paddingBottom: 20,
+        padding: 16,
+        paddingBottom: 10,
     },
     messageContainer: {
-        marginBottom: 8,
-        maxWidth: '85%',
+        marginBottom: 4,
+        maxWidth: '80%',
     },
     myMessageContainer: {
         alignSelf: 'flex-end',
@@ -863,32 +863,34 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     messageBubble: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 18,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
+        shadowOffset: { width: 0, height: 0.5 },
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
     },
     myBubbleRadius: {
-        borderBottomRightRadius: 4,
+        borderBottomRightRadius: 5,
     },
     theirBubbleRadius: {
-        borderBottomLeftRadius: 4,
+        borderBottomLeftRadius: 5,
     },
     messageText: {
-        fontSize: 16,
-        lineHeight: 22,
+        fontSize: 15.5,
+        lineHeight: 21,
+        letterSpacing: 0.2,
     },
     messageFooter: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        marginTop: 2,
+        marginTop: 3,
     },
     timestamp: {
-        fontSize: 10,
+        fontSize: 10.5,
+        letterSpacing: 0.1,
     },
     messageImage: {
         width: 240,
