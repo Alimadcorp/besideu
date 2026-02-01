@@ -12,7 +12,7 @@ export async function PUT(req) {
     try {
         const body = await req.json();
         const {
-            real_name, email, preferences, avatar_url, expo_push_token,
+            username, real_name, email, preferences, avatar_url, expo_push_token,
             bio, website, business_type, public_phone, status, status_expiration, is_business,
             scheduled_status, scheduled_status_at, scheduled_status_expiration
         } = body;
@@ -29,6 +29,14 @@ export async function PUT(req) {
         }
 
         const updates = {};
+        if (username !== undefined) {
+            // Validate username: lowercase alphanumeric + underscores, max 31
+            const isValid = /^[a-z0-9_]{1,31}$/.test(username);
+            if (!isValid) {
+                return NextResponse.json({ error: 'Invalid username format', code: 'invalid_username' }, { status: 400 });
+            }
+            updates.username = username;
+        }
         if (real_name !== undefined) updates.real_name = real_name;
         if (email !== undefined) updates.email = email;
         if (preferences !== undefined) updates.preferences = preferences;

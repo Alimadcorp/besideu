@@ -291,27 +291,37 @@ export default function ViewStatusScreen() {
 
             {/* Reply Input */}
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={styles.keyboardView}
             >
-                <TextInput
-                    style={styles.replyInput}
-                    placeholder="Reply..."
-                    placeholderTextColor="rgba(255,255,255,0.7)"
-                    value={replyText}
-                    onChangeText={setReplyText}
-                    onSubmitEditing={() => {
-                        if (replyText.trim()) {
-                            // Find DM or navigate
-                            // For simplicity, we navigate to chat with default params or try to find chat
-                            // But better: Use router with params or just close and alert "Replied"
-                            Alert.alert('Sent', 'Reply sent!');
+                <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
+                    <TextInput
+                        style={styles.replyInput}
+                        placeholder="Reply..."
+                        placeholderTextColor="rgba(255,255,255,0.7)"
+                        value={replyText}
+                        onChangeText={setReplyText}
+                        onFocus={() => setPaused(true)}
+                        onBlur={() => setPaused(false)}
+                        onSubmitEditing={async () => {
+                            if (!replyText.trim()) return;
+
+                            const text = replyText.trim();
                             setReplyText('');
-                            setKeyboardVisible(false);
                             Keyboard.dismiss();
-                        }
-                    }}
-                />
+
+                            try {
+                                await apiRequest(`/v1/status/${currentStatus.id}/reply`, {
+                                    method: 'POST',
+                                    body: JSON.stringify({ text })
+                                });
+                                Alert.alert('Sent', 'Reply sent!');
+                            } catch (error: any) {
+                                Alert.alert('Error', error.message || 'Failed to send reply');
+                            }
+                        }}
+                    />
+                </View>
             </KeyboardAvoidingView>
         </View>
     );
@@ -434,5 +444,10 @@ const styles = StyleSheet.create({
         fontSize: 16,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.3)'
+    },
+    keyboardView: {
+        position: 'absolute',
+        bottom: 0,
+        width: '100%',
     }
 });

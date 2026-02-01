@@ -175,7 +175,18 @@ export default function ProfileScreen() {
 
     const handleUpdateField = () => {
         if (editMode) {
-            updateProfile({ [editMode.field]: tempValue.trim() });
+            let value = tempValue.trim();
+            if (editMode.field === 'username') {
+                value = value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                if (value.length === 0) {
+                    Alert.alert('Error', 'Username cannot be empty');
+                    return;
+                }
+                if (value.length > 31) {
+                    value = value.slice(0, 31);
+                }
+            }
+            updateProfile({ [editMode.field]: value });
             setEditMode(null);
         }
     };
@@ -325,13 +336,19 @@ export default function ProfileScreen() {
                         <IconSymbol name="pencil" size={16} color={theme.icon} />
                     </TouchableOpacity>
 
-                    <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
+                    <TouchableOpacity
+                        style={[styles.row, { borderBottomColor: theme.icon + '20' }]}
+                        onPress={() => {
+                            setTempValue(user?.username || '');
+                            setEditMode({ field: 'username', label: 'Username' });
+                        }}
+                    >
                         <View>
                             <ThemedText style={styles.rowLabel}>Username</ThemedText>
                             <ThemedText style={styles.rowSubtext}>@{user?.username}</ThemedText>
                         </View>
-                        <ThemedText style={[styles.rowValue, { fontSize: 12 }]}>Locked</ThemedText>
-                    </View>
+                        <IconSymbol name="pencil" size={16} color={theme.icon} />
+                    </TouchableOpacity>
 
                     <View style={[styles.row, { borderBottomColor: theme.icon + '20' }]}>
                         <View>
@@ -864,6 +881,11 @@ export default function ProfileScreen() {
                             multiline={editMode?.multiline}
                             autoFocus
                         />
+                        {editMode?.field === 'username' && (
+                            <ThemedText style={{ fontSize: 10, opacity: 0.5, marginTop: -15, marginBottom: 15 }}>
+                                Lowercase, numbers and underscores only (max 31 chars)
+                            </ThemedText>
+                        )}
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
                                 style={[styles.modalBtn, { backgroundColor: theme.icon + '20' }]}

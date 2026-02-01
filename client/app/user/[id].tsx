@@ -37,11 +37,40 @@ export default function UserProfileScreen() {
         fetchUserProfile();
     }, [fetchUserProfile]);
 
+    const handleAcceptFriend = async () => {
+        if (!profile.request_id) return;
+        try {
+            await apiRequest(`/v1/friends/accept?id=${profile.request_id}`, { method: 'POST' });
+            Alert.alert('Success', 'Friend request accepted!');
+            fetchUserProfile();
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to accept request');
+        }
+    };
+
+    const handleUnfriend = async () => {
+        Alert.alert(
+            'Unfriend',
+            `Are you sure you want to unfriend ${profile.username}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await apiRequest(`/v1/friends/remove?user=${id}`, { method: 'DELETE' });
+                            fetchUserProfile();
+                        } catch (error: any) {
+                            Alert.alert('Error', error.message || 'Failed to remove friend');
+                        }
+                    }
+                },
+            ]
+        );
+    };
+
     const handleMessage = () => {
-        // Find the DM ID if it exists, or just push to chats/[id]
-        // Our backend usually maps friendship_id/dm_id. 
-        // If we don't have it, we might need to create it.
-        // For now, if we are on this screen, we might already have it or we can redirect to a search logic.
         router.push(`/chats/${id}` as any);
     };
 
@@ -101,16 +130,65 @@ export default function UserProfileScreen() {
 
                 {/* Actions */}
                 <View style={styles.actions}>
-                    <TouchableOpacity style={[styles.primaryAction, { backgroundColor: theme.tint }]} onPress={handleMessage}>
-                        <IconSymbol name="message.fill" size={20} color="white" />
-                        <ThemedText style={styles.actionText}>Message</ThemedText>
-                    </TouchableOpacity>
-
-                    {!profile.is_friend && (
-                        <TouchableOpacity style={[styles.secondaryAction, { borderColor: theme.tint }]} onPress={handleAddFriend}>
-                            <IconSymbol name="person.badge.plus.fill" size={20} color={theme.tint} />
-                            <ThemedText style={[styles.actionText, { color: theme.tint }]}>Add Friend</ThemedText>
+                    {profile.is_own_profile ? (
+                        <TouchableOpacity style={[styles.primaryAction, { backgroundColor: theme.tint }]} onPress={() => router.push('/(tabs)/profile')}>
+                            <IconSymbol name="pencil" size={20} color="white" />
+                            <ThemedText style={styles.actionText}>Edit Profile</ThemedText>
                         </TouchableOpacity>
+                    ) : (
+                        <>
+                            {profile.friendship_status === 'friends' && (
+                                <>
+                                    <TouchableOpacity style={[styles.primaryAction, { backgroundColor: theme.tint }]} onPress={handleMessage}>
+                                        <IconSymbol name="message.fill" size={20} color="white" />
+                                        <ThemedText style={styles.actionText}>Message</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.secondaryAction, { borderColor: '#FF3B30' }]} onPress={handleUnfriend}>
+                                        <IconSymbol name="person.badge.minus" size={20} color="#FF3B30" />
+                                        <ThemedText style={[styles.actionText, { color: '#FF3B30' }]}>Unfriend</ThemedText>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+
+                            {profile.friendship_status === 'pending_sent' && (
+                                <>
+                                    <TouchableOpacity style={[styles.primaryAction, { backgroundColor: theme.tint }]} onPress={handleMessage}>
+                                        <IconSymbol name="message.fill" size={20} color="white" />
+                                        <ThemedText style={styles.actionText}>Message</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.secondaryAction, { borderColor: theme.tint + '40' }]} disabled>
+                                        <IconSymbol name="clock.fill" size={20} color={theme.icon} />
+                                        <ThemedText style={[styles.actionText, { color: theme.icon }]}>Pending</ThemedText>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+
+                            {profile.friendship_status === 'pending_received' && (
+                                <>
+                                    <TouchableOpacity style={[styles.primaryAction, { backgroundColor: '#34C759' }]} onPress={handleAcceptFriend}>
+                                        <IconSymbol name="checkmark.circle.fill" size={20} color="white" />
+                                        <ThemedText style={styles.actionText}>Accept</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.secondaryAction, { borderColor: theme.tint }]} onPress={handleMessage}>
+                                        <IconSymbol name="message.fill" size={20} color={theme.tint} />
+                                        <ThemedText style={[styles.actionText, { color: theme.tint }]}>Message</ThemedText>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+
+                            {profile.friendship_status === 'none' && (
+                                <>
+                                    <TouchableOpacity style={[styles.primaryAction, { backgroundColor: theme.tint }]} onPress={handleAddFriend}>
+                                        <IconSymbol name="person.badge.plus.fill" size={20} color="white" />
+                                        <ThemedText style={styles.actionText}>Add Friend</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.secondaryAction, { borderColor: theme.tint }]} onPress={handleMessage}>
+                                        <IconSymbol name="message.fill" size={20} color={theme.tint} />
+                                        <ThemedText style={[styles.actionText, { color: theme.tint }]}>Message</ThemedText>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+                        </>
                     )}
                 </View>
 
@@ -140,18 +218,20 @@ export default function UserProfileScreen() {
                 </View>
 
                 {/* Business Section */}
-                {profile.is_business && (
-                    <View style={styles.section}>
-                        <ThemedText type="subtitle" style={styles.sectionTitle}>Business Info</ThemedText>
-                        <View style={styles.infoRow}>
-                            <IconSymbol name="tag.fill" size={18} color={theme.icon} />
-                            <ThemedText style={styles.infoText}>{profile.business_type || 'Professional'}</ThemedText>
+                {
+                    profile.is_business && (
+                        <View style={styles.section}>
+                            <ThemedText type="subtitle" style={styles.sectionTitle}>Business Info</ThemedText>
+                            <View style={styles.infoRow}>
+                                <IconSymbol name="tag.fill" size={18} color={theme.icon} />
+                                <ThemedText style={styles.infoText}>{profile.business_type || 'Professional'}</ThemedText>
+                            </View>
+                            <View style={{ marginTop: 10 }}>
+                                <ThemedText style={styles.emptyText}>This is a verified business account.</ThemedText>
+                            </View>
                         </View>
-                        <View style={{ marginTop: 10 }}>
-                            <ThemedText style={styles.emptyText}>This is a verified business account.</ThemedText>
-                        </View>
-                    </View>
-                )}
+                    )
+                }
 
                 {/* Last Online */}
                 <View style={styles.footer}>
@@ -159,8 +239,8 @@ export default function UserProfileScreen() {
                         {profile.is_online ? 'Active now' : profile.last_online ? `Last seen ${new Date(profile.last_online).toLocaleString()}` : 'Last seen unknown'}
                     </ThemedText>
                 </View>
-            </ScrollView>
-        </ThemedView>
+            </ScrollView >
+        </ThemedView >
     );
 }
 

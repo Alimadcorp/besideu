@@ -28,6 +28,8 @@ export async function apiRequest(endpoint: string, options: RequestOptions = {})
         headers.set('Content-Type', 'application/json');
     }
 
+    headers.set('X-App-Platform', 'besideu-mobile');
+
     let response = await fetch(`${API_URL}${endpoint}`, {
         ...fetchOptions,
         headers,

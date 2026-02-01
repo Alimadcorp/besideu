@@ -47,6 +47,8 @@ const MAPPING = {
   'calendar.badge.plus': 'edit-calendar',
   'circle.dashed': 'donut-large',
   'plus.circle.fill': 'add-circle',
+  'person.badge.plus.fill': 'person-add',
+  'person.badge.minus.fill': 'person-remove',
 } as IconMapping;
 
 /**

@@ -11,31 +11,36 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 const SLIDES = [
     {
         key: 'one',
-        title: 'Discover Who is Beside you',
-        text: 'The world is full of connections waiting to happen. See who’s nearby and start your journey.',
-        icon: 'planet-outline',
+        title: 'Discover Nearby',
+        text: 'BesideU helps you find friends and interesting people right where you are.',
+        icon: 'location-outline',
+        color: '#007AFF',
     },
     {
         key: 'two',
-        title: 'Real-Time Nearby Radar',
-        text: 'Find friends and interesting people within your instant range. No stalking, just connecting.',
-        icon: 'radio-outline',
+        title: 'Real-Time Radar',
+        text: 'Watch your circle move in real-time. Connect with friends within 3km instantly.',
+        icon: 'navigate-outline',
+        color: '#34C759',
     },
     {
         key: 'three',
         title: 'Instant Meetups',
-        text: 'See someone you know? Send a "Meetup Request" to share live locations for 1 hour.',
-        icon: 'flash-outline',
+        text: 'See someone nearby? Send a request to share live locations and meet up.',
+        icon: 'people-outline',
+        color: '#FF9500',
     },
     {
         key: 'four',
-        title: 'Private & Secure',
-        text: 'Your location is yours. Share it only when you want, with whom you want.',
+        title: 'Safe & Secure',
+        text: 'Your privacy is built-in. Control exactly who sees you and when.',
         icon: 'shield-checkmark-outline',
+        color: '#5856D6',
     },
 ];
 
@@ -44,6 +49,7 @@ export default function IntroScreen() {
     const { setHasSeenIntro, user } = useAuth();
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollRef = useRef<ScrollView>(null);
+    const scrollX = useRef(new Animated.Value(0)).current;
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
@@ -53,7 +59,6 @@ export default function IntroScreen() {
     const slideAnim = useRef(new Animated.Value(30)).current;
 
     useEffect(() => {
-        // Reset and play animation on slide change
         fadeAnim.setValue(0);
         slideAnim.setValue(30);
 
@@ -75,24 +80,28 @@ export default function IntroScreen() {
         if (activeIndex === SLIDES.length - 1) {
             setHasSeenIntro();
         } else {
-            scrollRef.current?.scrollTo({ x: width * (activeIndex + 1), animated: true });
+            // Use the ref from the ScrollView
+            (scrollRef.current as any)?.scrollTo({ x: width * (activeIndex + 1), animated: true });
         }
     };
 
-    const onScroll = (event: any) => {
-        const slide = Math.ceil(event.nativeEvent.contentOffset.x / event.nativeEvent.layoutMeasurement.width);
-        if (slide !== activeIndex) {
-            setActiveIndex(slide);
-        }
-    };
+    const bgColor = scrollX.interpolate({
+        inputRange: SLIDES.map((_, i) => i * width),
+        outputRange: SLIDES.map(s => s.color + '15'),
+    });
+
+    const activeColor = scrollX.interpolate({
+        inputRange: SLIDES.map((_, i) => i * width),
+        outputRange: SLIDES.map(s => s.color),
+    });
 
     return (
-        <ThemedView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <Animated.View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: bgColor }]}>
             {/* Background Decor */}
             <View style={[styles.circleDecor, { backgroundColor: theme.tint, opacity: 0.1, top: -100, right: -100 }]} />
-            <View style={[styles.circleDecor, { backgroundColor: theme.tint, opacity: 0.05, bottom: -50, left: -50, width: 200, height: 200, borderRadius: 100 }]} />
+            <View style={[styles.circleDecor, { backgroundColor: theme.tint, opacity: 0.05, bottom: -50, left: -50, width: 220, height: 220, borderRadius: 110 }]} />
 
-            {/* Profile Header (if logged in) */}
+            {/* Profile Header */}
             {user && (
                 <Animated.View style={[styles.userHeader, { opacity: fadeAnim }]}>
                     <Image
@@ -106,15 +115,25 @@ export default function IntroScreen() {
                 </Animated.View>
             )}
 
-            <ScrollView
-                ref={scrollRef}
+            <Animated.ScrollView
+                ref={scrollRef as any}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onScroll={onScroll}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                    {
+                        useNativeDriver: false, // backgroundColor interpolation needs false for some properties, but we'll try it
+                        listener: (event: any) => {
+                            const slide = Math.round(event.nativeEvent.contentOffset.x / width);
+                            if (slide !== activeIndex) {
+                                setActiveIndex(slide);
+                            }
+                        }
+                    }
+                )}
                 scrollEventThrottle={16}
                 style={{ flex: 1 }}
-                contentContainerStyle={{ alignItems: 'center' }}
             >
                 {SLIDES.map((slide, index) => (
                     <View key={slide.key} style={styles.slide}>
@@ -124,44 +143,60 @@ export default function IntroScreen() {
                             alignItems: 'center',
                             width: '100%'
                         }}>
-                            <View style={[styles.iconContainer, { backgroundColor: theme.tint + '15', shadowColor: theme.tint }]}>
-                                <Ionicons name={slide.icon as any} size={80} color={theme.tint} />
+                            <View style={[styles.iconContainer, { backgroundColor: slide.color + '20', shadowColor: slide.color }]}>
+                                <Ionicons name={slide.icon as any} size={80} color={slide.color} />
                             </View>
-                            <ThemedText type="title" style={styles.title}>{slide.title}</ThemedText>
+                            <ThemedText type="title" style={[styles.title, { color: slide.color }]}>{slide.title}</ThemedText>
                             <ThemedText style={styles.text}>{slide.text}</ThemedText>
                         </Animated.View>
                     </View>
                 ))}
-            </ScrollView>
+            </Animated.ScrollView>
 
             <View style={styles.footer}>
                 <View style={styles.pagination}>
-                    {SLIDES.map((_, i) => (
-                        <Animated.View
-                            key={i}
-                            style={[
-                                styles.paginationDot,
-                                {
-                                    backgroundColor: i === activeIndex ? theme.tint : theme.icon + '40',
-                                    width: i === activeIndex ? 20 : 8,
-                                }
-                            ]}
-                        />
-                    ))}
+                    {SLIDES.map((_, i) => {
+                        const dotWidth = scrollX.interpolate({
+                            inputRange: [(i - 1) * width, i * width, (i + 1) * width],
+                            outputRange: [8, 24, 8],
+                            extrapolate: 'clamp',
+                        });
+                        const opacity = scrollX.interpolate({
+                            inputRange: [(i - 1) * width, i * width, (i + 1) * width],
+                            outputRange: [0.3, 1, 0.3],
+                            extrapolate: 'clamp',
+                        });
+
+                        return (
+                            <Animated.View
+                                key={i}
+                                style={[
+                                    styles.paginationDot,
+                                    {
+                                        backgroundColor: activeColor,
+                                        width: dotWidth,
+                                        opacity
+                                    }
+                                ]}
+                            />
+                        );
+                    })}
                 </View>
 
-                <TouchableOpacity
-                    style={[styles.button, { backgroundColor: theme.tint, shadowColor: theme.tint }]}
-                    onPress={handleNext}
-                    activeOpacity={0.8}
-                >
-                    <ThemedText style={styles.buttonText}>
-                        {activeIndex === SLIDES.length - 1 ? "Let's Go" : 'Next'}
-                    </ThemedText>
-                    {activeIndex !== SLIDES.length - 1 && <Ionicons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />}
-                </TouchableOpacity>
+                <Animated.View style={{ width: '100%', alignItems: 'center' }}>
+                    <AnimatedTouchableOpacity
+                        style={[styles.button, { backgroundColor: activeColor, shadowColor: theme.tint }]}
+                        onPress={handleNext}
+                        activeOpacity={0.8}
+                    >
+                        <ThemedText style={styles.buttonText}>
+                            {activeIndex === SLIDES.length - 1 ? "Get Started" : 'Next'}
+                        </ThemedText>
+                        {activeIndex !== SLIDES.length - 1 && <Ionicons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />}
+                    </AnimatedTouchableOpacity>
+                </Animated.View>
             </View>
-        </ThemedView>
+        </Animated.View>
     );
 }
 

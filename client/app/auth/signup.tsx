@@ -163,15 +163,21 @@ export default function SignupScreen() {
                             <ThemedText style={styles.label}>Username *</ThemedText>
                             <TextInput
                                 style={[styles.input, { color: theme.text, borderColor: theme.icon }]}
-                                placeholder="johndoe"
+                                placeholder="johndoe_ravian"
                                 placeholderTextColor="#888"
                                 autoCapitalize="none"
+                                maxLength={31}
                                 onChangeText={(text) => {
-                                    setUsername(text);
+                                    // Only allow lowercase a-z, 0-9, and underscores
+                                    const filtered = text.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                                    setUsername(filtered);
                                     if (error) setError(null);
                                 }}
                                 value={username}
                             />
+                            <ThemedText style={{ fontSize: 10, opacity: 0.5, marginTop: -15, marginBottom: 15, marginLeft: 5 }}>
+                                Lowercase, numbers and underscores only (max 31 chars)
+                            </ThemedText>
 
                             <ThemedText style={styles.label}>Email (Optional)</ThemedText>
                             <TextInput

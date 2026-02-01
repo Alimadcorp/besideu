@@ -50,6 +50,8 @@ export async function GET(req, { params }) {
         // If viewing own profile, show all fields
         let isFriend = false;
         let isContact = false;
+        let friendshipStatus = 'none'; // 'none', 'pending_sent', 'pending_received', 'friends'
+        let requestId = null;
 
         if (!isOwnProfile) {
             // 1. Check if they are friends (order the pair to match database constraint)
@@ -61,7 +63,24 @@ export async function GET(req, { params }) {
                 .eq('user_id_2', u2)
                 .maybeSingle();
 
-            isFriend = !!friendship;
+            if (friendship) {
+                isFriend = true;
+                friendshipStatus = 'friends';
+            } else {
+                // Check for pending requests
+                const { data: request } = await supabaseAdmin
+                    .from('friend_requests')
+                    .select('*')
+                    .eq('status', 'pending')
+                    .or(`from_user_id.eq.${requester.id},from_user_id.eq.${targetId}`)
+                    .or(`to_user_id.eq.${requester.id},to_user_id.eq.${targetId}`)
+                    .maybeSingle();
+
+                if (request) {
+                    friendshipStatus = request.from_user_id === requester.id ? 'pending_sent' : 'pending_received';
+                    requestId = request.id;
+                }
+            }
 
             // 2. Check if the target is in the requester's contacts
             if (!isFriend) {
@@ -93,6 +112,8 @@ export async function GET(req, { params }) {
             is_online: targetUser.is_online,
             last_online: targetUser.last_online,
             is_friend: isFriend,
+            friendship_status: friendshipStatus,
+            request_id: requestId,
             is_own_profile: isOwnProfile,
         };
 
