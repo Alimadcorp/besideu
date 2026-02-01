@@ -26,8 +26,8 @@ export default function MeetingDetailsScreen() {
     const [isTracking, setIsTracking] = useState(false);
 
     // Refresh interval refs
-    const pollRef = useRef<NodeJS.Timeout>();
-    const trackRef = useRef<NodeJS.Timeout>();
+    const pollRef = useRef<any>(undefined);
+    const trackRef = useRef<any>(undefined);
 
     useEffect(() => {
         fetchMeeting();
@@ -182,14 +182,6 @@ export default function MeetingDetailsScreen() {
                         </TouchableOpacity>
                     </View>
                 )}
-                {meeting.channel_id && (
-                    <TouchableOpacity style={[styles.btn, { backgroundColor: theme.text, marginTop: 10 }]} onPress={() => router.push(`/chats/${meeting.channel_id}?type=meeting`)}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <IconSymbol name="bubble.left.fill" size={20} color={theme.background} />
-                            <ThemedText style={[styles.btnText, { color: theme.background }]}>Open Group Chat</ThemedText>
-                        </View>
-                    </TouchableOpacity>
-                )}
             </View>
         </ScrollView>
     );
@@ -197,20 +189,27 @@ export default function MeetingDetailsScreen() {
     const renderLiveMap = () => {
         if (!meeting.is_creator) return <ThemedView style={styles.center}><ThemedText>Only the creator can view user locations.</ThemedText></ThemedView>;
 
+        const lat = Number(meeting.location?.lat);
+        const lon = Number(meeting.location?.lon);
+
+        if (!lat || !lon) {
+            return <ThemedView style={styles.center}><ThemedText>Invalid Meeting Location</ThemedText></ThemedView>;
+        }
+
         return (
             <View style={{ flex: 1 }}>
                 <MapView
                     style={{ flex: 1 }}
                     initialRegion={{
-                        latitude: meeting.location.lat,
-                        longitude: meeting.location.lon,
+                        latitude: lat,
+                        longitude: lon,
                         latitudeDelta: 0.05,
                         longitudeDelta: 0.05,
                     }}
                 >
                     {/* Meeting Location */}
-                    <Marker coordinate={{ latitude: meeting.location.lat, longitude: meeting.location.lon }} title={meeting.title} pinColor="blue" />
-                    <Circle center={{ latitude: meeting.location.lat, longitude: meeting.location.lon }} radius={meeting.threshold_km * 1000} fillColor="rgba(0, 150, 255, 0.2)" strokeColor="rgba(0, 150, 255, 0.5)" />
+                    <Marker coordinate={{ latitude: lat, longitude: lon }} title={meeting.title} pinColor="blue" />
+                    <Circle center={{ latitude: lat, longitude: lon }} radius={meeting.threshold_km * 1000} fillColor="rgba(0, 150, 255, 0.2)" strokeColor="rgba(0, 150, 255, 0.5)" />
 
                     {/* Attendees */}
                     {meeting.attendees?.filter((a: any) => a.current_lat && a.current_lon).map((a: any) => (

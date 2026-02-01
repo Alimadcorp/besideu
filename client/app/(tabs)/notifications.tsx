@@ -49,6 +49,12 @@ export default function NotificationsScreen() {
 
     useEffect(() => {
         fetchRequests();
+
+        const interval = setInterval(() => {
+            fetchRequests();
+        }, 30000);
+
+        return () => clearInterval(interval);
     }, [fetchRequests]);
 
     const onRefresh = useCallback(() => {

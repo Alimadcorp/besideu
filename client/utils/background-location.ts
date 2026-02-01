@@ -83,20 +83,24 @@ export async function startBackgroundLocationTracking() {
         return false;
     }
 
+    // High accuracy for better "BesideU" experience
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 60000, // Update every 60 seconds
-        distanceInterval: 100, // Or every 100 meters
+        accuracy: Location.Accuracy.High,
+        timeInterval: 30000,   // Every 30 seconds
+        distanceInterval: 30,  // Every 30 meters
         foregroundService: {
-            notificationTitle: 'BesideU Location',
-            notificationBody: 'Sharing your location with friends',
+            notificationTitle: 'BesideU Location Active',
+            notificationBody: 'Your location is being shared with friends nearby.',
             notificationColor: '#007AFF',
         },
-        pausesUpdatesAutomatically: false, // Keep running even when stationary
+        pausesUpdatesAutomatically: false,
         showsBackgroundLocationIndicator: true,
+        // Android specific
+        deferredUpdatesInterval: 30000,
+        deferredUpdatesDistance: 30,
     });
 
-    console.log('Background location tracking started');
+    console.log('Background location tracking started (Frequent Updates)');
     return true;
 }
 

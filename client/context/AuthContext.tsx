@@ -4,6 +4,7 @@ import { apiRequest, setOnUnauthorizedCallback } from '@/utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { connectWebSocket, disconnectWebSocket } from '@/utils/socket';
+import { startBackgroundLocationTracking, stopBackgroundLocationTracking } from '@/utils/background-location';
 
 type User = {
     id: string;
@@ -71,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser(userData);
                 connectWebSocket();
                 registerPush(); // Run in background
+                startBackgroundLocationTracking();
             } else if (token) {
                 // Token exists but no user data, try to fetch or Logout
                 await removeToken();
@@ -95,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(data.user);
             connectWebSocket();
             registerPush();
+            startBackgroundLocationTracking();
         } catch (error) {
             console.error('Sign in failed', error);
             throw error;
@@ -119,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(data.user);
             connectWebSocket();
             registerPush();
+            startBackgroundLocationTracking();
         } catch (error) {
             console.error('Sign up failed', error);
             throw error;
@@ -140,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         await removeToken();
         disconnectWebSocket();
+        stopBackgroundLocationTracking();
         setUser(null);
         router.replace('/auth/login');
     }

@@ -4,8 +4,6 @@ const path = require('path');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-console.warn('--- Metro config is being loaded with Firebase aliases ---');
-
 config.resolver.extraNodeModules = {
     ...config.resolver.extraNodeModules,
     'firebase': path.resolve(__dirname, 'utils/firebase-compat.ts'),

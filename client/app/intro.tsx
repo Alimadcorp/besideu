@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Image } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Animated, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,38 +15,61 @@ const { width, height } = Dimensions.get('window');
 const SLIDES = [
     {
         key: 'one',
-        title: 'Welcome to BesideU',
-        text: 'Reconnecting you with the people around you.\n\nAn app by Habeebullah Arif Wattoo',
-        icon: 'people-circle-outline',
+        title: 'Discover Who is Beside you',
+        text: 'The world is full of connections waiting to happen. See who’s nearby and start your journey.',
+        icon: 'planet-outline',
     },
     {
         key: 'two',
-        title: 'The Nearby Feature',
-        text: 'See friends who are within your range.\nFind out who is beside you right now.',
-        icon: 'location-outline',
+        title: 'Real-Time Nearby Radar',
+        text: 'Find friends and interesting people within your instant range. No stalking, just connecting.',
+        icon: 'radio-outline',
     },
     {
         key: 'three',
-        title: 'Private Chats',
-        text: 'Securely chat with your friends.\nStay in touch anytime, anywhere.',
-        icon: 'chatbubbles-outline',
+        title: 'Instant Meetups',
+        text: 'See someone you know? Send a "Meetup Request" to share live locations for 1 hour.',
+        icon: 'flash-outline',
     },
     {
         key: 'four',
-        title: 'Meetups',
-        text: 'Ready to meet? Send a meetup request to get their live location for an hour.',
-        icon: 'map-outline',
+        title: 'Private & Secure',
+        text: 'Your location is yours. Share it only when you want, with whom you want.',
+        icon: 'shield-checkmark-outline',
     },
 ];
 
 export default function IntroScreen() {
     const router = useRouter();
-    const { setHasSeenIntro } = useAuth();
+    const { setHasSeenIntro, user } = useAuth();
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollRef = useRef<ScrollView>(null);
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
-    const themeColors = Colors[colorScheme ?? 'light'];
+    const theme = Colors[colorScheme ?? 'light'];
+
+    // Animation Values
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+
+    useEffect(() => {
+        // Reset and play animation on slide change
+        fadeAnim.setValue(0);
+        slideAnim.setValue(30);
+
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 600,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 600,
+                useNativeDriver: true,
+            })
+        ]).start();
+    }, [activeIndex]);
 
     const handleNext = async () => {
         if (activeIndex === SLIDES.length - 1) {
@@ -64,6 +88,24 @@ export default function IntroScreen() {
 
     return (
         <ThemedView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+            {/* Background Decor */}
+            <View style={[styles.circleDecor, { backgroundColor: theme.tint, opacity: 0.1, top: -100, right: -100 }]} />
+            <View style={[styles.circleDecor, { backgroundColor: theme.tint, opacity: 0.05, bottom: -50, left: -50, width: 200, height: 200, borderRadius: 100 }]} />
+
+            {/* Profile Header (if logged in) */}
+            {user && (
+                <Animated.View style={[styles.userHeader, { opacity: fadeAnim }]}>
+                    <Image
+                        source={{ uri: user.avatar_url || 'https://via.placeholder.com/150' }}
+                        style={styles.userAvatar}
+                    />
+                    <View>
+                        <ThemedText style={styles.welcomeText}>Welcome back,</ThemedText>
+                        <ThemedText type="defaultSemiBold" style={styles.userNameText}>{user.real_name || user.username}</ThemedText>
+                    </View>
+                </Animated.View>
+            )}
+
             <ScrollView
                 ref={scrollRef}
                 horizontal
@@ -71,17 +113,23 @@ export default function IntroScreen() {
                 showsHorizontalScrollIndicator={false}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
-                className="flex-1"
+                style={{ flex: 1 }}
+                contentContainerStyle={{ alignItems: 'center' }}
             >
                 {SLIDES.map((slide, index) => (
                     <View key={slide.key} style={styles.slide}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name={slide.icon as any} size={100} color={themeColors.tint} />
-                        </View>
-                        <View style={styles.textContainer}>
+                        <Animated.View style={{
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideAnim }],
+                            alignItems: 'center',
+                            width: '100%'
+                        }}>
+                            <View style={[styles.iconContainer, { backgroundColor: theme.tint + '15', shadowColor: theme.tint }]}>
+                                <Ionicons name={slide.icon as any} size={80} color={theme.tint} />
+                            </View>
                             <ThemedText type="title" style={styles.title}>{slide.title}</ThemedText>
                             <ThemedText style={styles.text}>{slide.text}</ThemedText>
-                        </View>
+                        </Animated.View>
                     </View>
                 ))}
             </ScrollView>
@@ -89,23 +137,28 @@ export default function IntroScreen() {
             <View style={styles.footer}>
                 <View style={styles.pagination}>
                     {SLIDES.map((_, i) => (
-                        <View
+                        <Animated.View
                             key={i}
                             style={[
                                 styles.paginationDot,
-                                { backgroundColor: i === activeIndex ? themeColors.tint : '#ccc' },
+                                {
+                                    backgroundColor: i === activeIndex ? theme.tint : theme.icon + '40',
+                                    width: i === activeIndex ? 20 : 8,
+                                }
                             ]}
                         />
                     ))}
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.button, { backgroundColor: themeColors.tint }]}
+                    style={[styles.button, { backgroundColor: theme.tint, shadowColor: theme.tint }]}
                     onPress={handleNext}
+                    activeOpacity={0.8}
                 >
                     <ThemedText style={styles.buttonText}>
-                        {activeIndex === SLIDES.length - 1 ? 'Get Started' : 'Next'}
+                        {activeIndex === SLIDES.length - 1 ? "Let's Go" : 'Next'}
                     </ThemedText>
+                    {activeIndex !== SLIDES.length - 1 && <Ionicons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />}
                 </TouchableOpacity>
             </View>
         </ThemedView>
@@ -118,34 +171,40 @@ const styles = StyleSheet.create({
     },
     slide: {
         width,
-        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 40,
     },
     iconContainer: {
-        marginBottom: 40,
-        marginTop: -50,
-    },
-    textContainer: {
+        width: 160,
+        height: 160,
+        borderRadius: 80,
+        justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: 40,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
     },
     title: {
         textAlign: 'center',
-        marginBottom: 20,
-        fontSize: 28,
+        marginBottom: 16,
+        fontSize: 32,
+        fontWeight: 'bold',
     },
     text: {
         textAlign: 'center',
-        fontSize: 16,
-        lineHeight: 24,
-        opacity: 0.8,
+        fontSize: 18,
+        lineHeight: 28,
+        opacity: 0.7,
+        maxWidth: '90%',
     },
     footer: {
-        height: 120,
+        height: 150,
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingBottom: 20,
+        paddingBottom: 40,
     },
     pagination: {
         flexDirection: 'row',
@@ -154,21 +213,56 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     paginationDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        marginHorizontal: 8,
+        height: 8,
+        borderRadius: 4,
+        marginHorizontal: 4,
     },
     button: {
-        paddingVertical: 15,
+        flexDirection: 'row',
+        paddingVertical: 16,
         paddingHorizontal: 40,
         borderRadius: 30,
-        minWidth: 200,
+        minWidth: 220,
         alignItems: 'center',
+        justifyContent: 'center',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 15,
+        elevation: 8,
     },
     buttonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
+        letterSpacing: 0.5,
     },
+    circleDecor: {
+        position: 'absolute',
+        width: 300,
+        height: 300,
+        borderRadius: 150,
+        zIndex: -1,
+    },
+    userHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 30,
+        paddingVertical: 20,
+        gap: 15,
+        alignSelf: 'flex-start',
+    },
+    userAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        borderWidth: 2,
+        borderColor: 'white',
+    },
+    welcomeText: {
+        fontSize: 14,
+        opacity: 0.6,
+    },
+    userNameText: {
+        fontSize: 16,
+    }
 });

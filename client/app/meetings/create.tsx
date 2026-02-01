@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, TextInput, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator, Modal } from 'react-native';
+import { StyleSheet, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Modal, Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -19,7 +20,6 @@ export default function CreateMeetingScreen() {
     const [description, setDescription] = useState('');
     const [locationName, setLocationName] = useState('');
     const [threshold, setThreshold] = useState(1.0);
-    const [hasChannel, setHasChannel] = useState(false);
     const [creating, setCreating] = useState(false);
 
     // Simplistic location handling - defaults to current location
@@ -39,6 +39,7 @@ export default function CreateMeetingScreen() {
 
     useEffect(() => {
         fetchContactsAndFriends();
+        getCurrentLocation();
     }, []);
 
     const fetchContactsAndFriends = async () => {
@@ -94,7 +95,7 @@ export default function CreateMeetingScreen() {
                 const name = [addr.name, addr.street, addr.city].filter(Boolean).join(', ');
                 setLocationName(name);
             } else {
-                setLocationName('Use Current Location');
+                setLocationName('Current Location');
             }
         } catch (e) {
             console.error(e);
@@ -129,7 +130,7 @@ export default function CreateMeetingScreen() {
                     threshold_km: threshold,
                     starts_at: startDate.toISOString(),
                     ends_at: endDate.toISOString(),
-                    has_channel: hasChannel,
+                    has_channel: false, // Disabled as requested
                     invite_user_ids: Array.from(selectedInvitees)
                 })
             });
@@ -151,58 +152,23 @@ export default function CreateMeetingScreen() {
         }
     };
 
-    // Reusable DateTime Picker Modal Component logic would go here, simplified custom picker:
-    const renderDatePicker = (
-        visible: boolean,
-        onClose: () => void,
-        date: Date,
-        setDate: (d: Date) => void,
-        minDate?: Date
-    ) => (
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <View style={styles.modalOverlay}>
-                <ThemedView style={styles.modalContent}>
-                    <ThemedText type="subtitle" style={{ marginBottom: 20 }}>Select Date & Time</ThemedText>
-                    <ThemedText style={{ marginBottom: 20, textAlign: 'center' }}>
-                        {date.toLocaleString()}
-                    </ThemedText>
+    const onStartDateChange = (event: any, selectedDate?: Date) => {
+        setShowStartPicker(false);
+        if (selectedDate) {
+            setStartDate(selectedDate);
+            // Default expected end time to +1 hours
+            if (selectedDate > endDate) {
+                setEndDate(new Date(selectedDate.getTime() + 3600000));
+            }
+        }
+    };
 
-                    <View style={styles.pickerControls}>
-                        <View style={styles.row}>
-                            <TouchableOpacity style={styles.pickerBtn} onPress={() => {
-                                const d = new Date(date);
-                                d.setDate(d.getDate() - 1);
-                                if (minDate && d < minDate) return;
-                                setDate(d);
-                            }}><ThemedText>-1 Day</ThemedText></TouchableOpacity>
-                            <TouchableOpacity style={styles.pickerBtn} onPress={() => {
-                                const d = new Date(date);
-                                d.setDate(d.getDate() + 1);
-                                setDate(d);
-                            }}><ThemedText>+1 Day</ThemedText></TouchableOpacity>
-                        </View>
-                        <View style={styles.row}>
-                            <TouchableOpacity style={styles.pickerBtn} onPress={() => {
-                                const d = new Date(date);
-                                d.setHours(d.getHours() - 1);
-                                if (minDate && d < minDate) return;
-                                setDate(d);
-                            }}><ThemedText>-1 Hr</ThemedText></TouchableOpacity>
-                            <TouchableOpacity style={styles.pickerBtn} onPress={() => {
-                                const d = new Date(date);
-                                d.setHours(d.getHours() + 1);
-                                setDate(d);
-                            }}><ThemedText>+1 Hr</ThemedText></TouchableOpacity>
-                        </View>
-                    </View>
-
-                    <TouchableOpacity style={[styles.btn, { marginTop: 20, backgroundColor: theme.tint }]} onPress={onClose}>
-                        <ThemedText style={{ color: 'white', fontWeight: 'bold' }}>Confirm</ThemedText>
-                    </TouchableOpacity>
-                </ThemedView>
-            </View>
-        </Modal>
-    );
+    const onEndDateChange = (event: any, selectedDate?: Date) => {
+        setShowEndPicker(false);
+        if (selectedDate) {
+            setEndDate(selectedDate);
+        }
+    };
 
     return (
         <ThemedView style={styles.container}>
@@ -259,25 +225,71 @@ export default function CreateMeetingScreen() {
 
                 <View style={styles.section}>
                     <ThemedText style={styles.label}>Start Time</ThemedText>
-                    <TouchableOpacity
-                        style={[styles.input, { justifyContent: 'center', borderColor: theme.icon + '40' }]}
-                        onPress={() => setShowStartPicker(true)}
-                    >
-                        <ThemedText>{startDate.toLocaleString()}</ThemedText>
-                    </TouchableOpacity>
+                    {Platform.OS === 'ios' ? (
+                        <DateTimePicker
+                            testID="startDatePicker"
+                            value={startDate}
+                            mode="datetime"
+                            display="compact"
+                            onChange={(e, d) => d && setStartDate(d)}
+                            style={{ alignSelf: 'flex-start' }}
+                        />
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.input, { justifyContent: 'center', borderColor: theme.icon + '40' }]}
+                                onPress={() => setShowStartPicker(true)}
+                            >
+                                <ThemedText>{startDate.toLocaleString()}</ThemedText>
+                            </TouchableOpacity>
+                            {showStartPicker && (
+                                <DateTimePicker
+                                    testID="startDatePicker"
+                                    value={startDate}
+                                    mode="datetime"
+                                    is24Hour={true}
+                                    display="default"
+                                    onChange={onStartDateChange}
+                                />
+                            )}
+                        </>
+                    )}
                 </View>
 
                 <View style={styles.section}>
                     <ThemedText style={styles.label}>End Time</ThemedText>
-                    <TouchableOpacity
-                        style={[styles.input, { justifyContent: 'center', borderColor: theme.icon + '40' }]}
-                        onPress={() => setShowEndPicker(true)}
-                    >
-                        <ThemedText>{endDate.toLocaleString()}</ThemedText>
-                    </TouchableOpacity>
+                    {Platform.OS === 'ios' ? (
+                        <DateTimePicker
+                            testID="endDatePicker"
+                            value={endDate}
+                            mode="datetime"
+                            display="compact"
+                            onChange={(e, d) => d && setEndDate(d)}
+                            minimumDate={startDate}
+                            style={{ alignSelf: 'flex-start' }}
+                        />
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.input, { justifyContent: 'center', borderColor: theme.icon + '40' }]}
+                                onPress={() => setShowEndPicker(true)}
+                            >
+                                <ThemedText>{endDate.toLocaleString()}</ThemedText>
+                            </TouchableOpacity>
+                            {showEndPicker && (
+                                <DateTimePicker
+                                    testID="endDatePicker"
+                                    value={endDate}
+                                    mode="datetime"
+                                    is24Hour={true}
+                                    display="default"
+                                    onChange={onEndDateChange}
+                                    minimumDate={startDate}
+                                />
+                            )}
+                        </>
+                    )}
                 </View>
-
-
 
                 <View style={styles.section}>
                     <ThemedText style={styles.label}>Invite People</ThemedText>
@@ -293,18 +305,6 @@ export default function CreateMeetingScreen() {
                     </TouchableOpacity>
                 </View>
 
-                <View style={[styles.section, styles.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
-                    <View>
-                        <ThemedText style={styles.label}>Create Group Chat</ThemedText>
-                        <ThemedText style={{ fontSize: 12, opacity: 0.6 }}>Automatically create a channel</ThemedText>
-                    </View>
-                    <Switch
-                        value={hasChannel}
-                        onValueChange={setHasChannel}
-                        trackColor={{ true: theme.tint }}
-                    />
-                </View>
-
                 <TouchableOpacity
                     style={[styles.btn, { backgroundColor: theme.tint, marginTop: 20 }]}
                     onPress={handleCreate}
@@ -318,9 +318,6 @@ export default function CreateMeetingScreen() {
                 </TouchableOpacity>
 
             </ScrollView>
-
-            {renderDatePicker(showStartPicker, () => setShowStartPicker(false), startDate, setStartDate)}
-            {renderDatePicker(showEndPicker, () => setShowEndPicker(false), endDate, setEndDate, startDate)}
 
             <Modal visible={showInviteModal} transparent animationType="slide" onRequestClose={() => setShowInviteModal(false)}>
                 <View style={styles.modalOverlay}>
@@ -424,17 +421,6 @@ const styles = StyleSheet.create({
         maxWidth: 340,
         borderRadius: 20,
         padding: 20,
-        alignItems: 'center',
-    },
-    pickerControls: {
-        gap: 15,
-        width: '100%',
-    },
-    pickerBtn: {
-        flex: 1,
-        padding: 10,
-        backgroundColor: 'rgba(150, 150, 150, 0.1)',
-        borderRadius: 8,
         alignItems: 'center',
     },
     inviteItem: {

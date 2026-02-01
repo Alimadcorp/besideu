@@ -176,9 +176,16 @@ export default function ChatScreen() {
             }
         }, 30000); // Every 30 seconds
 
+        // Auto-poll messages every 10 seconds
+        const pollInterval = setInterval(() => {
+            // Only poll if we reached the last message (basic optimization)
+            fetchMessages(lastMessageTimestamp.current).then(() => markAsRead());
+        }, 10000);
+
         return () => {
             removeListener();
             clearInterval(profileInterval);
+            clearInterval(pollInterval);
         };
     }, [fetchMessages, id, markAsRead, chatUser?.id, fetchUserProfile]);
 

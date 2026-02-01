@@ -88,29 +88,24 @@ export default function NearbyScreen() {
       // We can still proceed with foreground features
     }
 
+    // Global background tracking is now managed in AuthContext via startBackgroundLocationTracking()
+    // We just need to ensure permissions are checked here for the UI
     setLocationPermission(foregroundStatus);
     fetchNearbyUsers();
-
-    // Start background task if granted
-    if (backgroundStatus === 'granted') {
-      const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-      if (!isRegistered) {
-        await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-          accuracy: Location.Accuracy.Balanced,
-          timeInterval: 60000, // 1 minute
-          distanceInterval: 100, // 100 meters
-          foregroundService: {
-            notificationTitle: "BesideU is running",
-            notificationBody: "Updating your location to find nearby friends.",
-          },
-        });
-      }
-    }
   };
 
   useEffect(() => {
     requestPermissions();
-  }, [fetchNearbyUsers]);
+
+    // Auto-poll location every 30 seconds
+    const interval = setInterval(() => {
+      if (locationPermission === 'granted') {
+        fetchNearbyUsers();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchNearbyUsers, locationPermission]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
