@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../../../../../../lib/supabaseClient';
 import { getCurrentUserFromRequest } from '../../../../../../lib/authUser';
 
 export async function POST(req, { params }) {
-    const { id } = params;
+    const { id } = await params;
     const { user, error: authError } = await getCurrentUserFromRequest(req);
     if (!user) {
         return NextResponse.json({ error: authError || 'Unauthorized', code: 'unauthorized' }, { status: 401 });

@@ -46,7 +46,7 @@ export async function GET(req) {
             .from('user_statuses')
             .select(`
                 *,
-                users!inner(id, username, real_name, avatar_url)
+                users:users!user_statuses_user_id_fkey!inner(id, username, real_name, avatar_url)
             `)
             .in('user_id', friendIds)
             .gt('expires_at', now)

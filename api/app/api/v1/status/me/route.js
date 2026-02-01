@@ -14,7 +14,7 @@ export async function GET(req) {
         // Fetch active statuses (not expired) and also future scheduled ones
         const { data, error } = await supabaseAdmin
             .from('user_statuses')
-            .select('*, users!inner(id, username, real_name, avatar_url)')
+            .select('*, users:users!user_statuses_user_id_fkey!inner(id, username, real_name, avatar_url)')
             .eq('user_id', user.id)
             .gt('expires_at', now)
             .order('created_at', { ascending: false });

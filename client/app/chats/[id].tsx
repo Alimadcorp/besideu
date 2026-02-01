@@ -113,7 +113,18 @@ export default function ChatScreen() {
 
             const queryString = params.toString();
             if (queryString) url += `?${queryString}`;
-            const data: ChatData = await apiRequest(url);
+            //const data: ChatData = await apiRequest(url);
+            const data: ChatData = {
+                dm_id: "chatId",
+                user: { id: "chatInfo", username: "a" },
+                messages: [{
+                    id: "www",
+                    text: "aidwhoiahdt holy hap\nnew line content\t\r\nhwuauwhauh",
+                    sender_id: "wwww",
+                    timestamp: "2025-01-01T12:12:12.000Z",
+                }],
+                reactions: [],
+            }
 
             if (!after) {
                 // Initial load
@@ -389,7 +400,7 @@ export default function ChatScreen() {
             // Short delay to ensure loading is done
             setTimeout(() => {
                 requestMeetup();
-            }, 500);
+            }, 1000);
         }
     }, [meetup, loading, requestMeetup]);
 
@@ -436,6 +447,7 @@ export default function ChatScreen() {
     };
 
     const handleDoubleTap = async (messageId: string) => {
+        return;
         try {
             await apiRequest(`/v1/messages/${id}/react`, {
                 method: 'POST',
@@ -445,23 +457,6 @@ export default function ChatScreen() {
         } catch (e) {
             console.log('Reaction failed', e);
         }
-    };
-
-    const formatDateHeader = (timestamp: string) => {
-        const date = new Date(timestamp);
-        const now = new Date();
-
-        if (date.toDateString() === now.toDateString()) {
-            return 'Today';
-        }
-
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        if (date.toDateString() === yesterday.toDateString()) {
-            return 'Yesterday';
-        }
-
-        return date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
     };
 
     // Group messages with date headers
@@ -683,7 +678,7 @@ export default function ChatScreen() {
                     }}
                     keyExtractor={(item, index) => item.type === 'date' ? `date-${item.date}` : item.message?.id || `msg-${index}`}
                     inverted
-                    contentContainerStyle={[styles.listContent, { paddingTop: 20 + keyboardPadding }]}
+                    contentContainerStyle={[styles.listContent, { paddingTop: 70 + keyboardPadding }]}
                     showsVerticalScrollIndicator={false}
                 />
 
@@ -852,7 +847,7 @@ const styles = StyleSheet.create({
     },
     messageContainer: {
         marginBottom: 4,
-        maxWidth: '80%',
+        maxWidth: '90%',
     },
     myMessageContainer: {
         alignSelf: 'flex-end',
@@ -863,14 +858,9 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     messageBubble: {
-        paddingHorizontal: 14,
-        paddingVertical: 9,
-        borderRadius: 18,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 0.5 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
-        elevation: 2,
+        paddingHorizontal: 11,
+        paddingVertical: 6,
+        borderRadius: 14
     },
     myBubbleRadius: {
         borderBottomRightRadius: 5,
@@ -879,9 +869,8 @@ const styles = StyleSheet.create({
         borderBottomLeftRadius: 5,
     },
     messageText: {
-        fontSize: 15.5,
-        lineHeight: 21,
-        letterSpacing: 0.2,
+        fontSize: 15,
+        lineHeight: 18
     },
     messageFooter: {
         flexDirection: 'row',
@@ -889,8 +878,7 @@ const styles = StyleSheet.create({
         marginTop: 3,
     },
     timestamp: {
-        fontSize: 10.5,
-        letterSpacing: 0.1,
+        fontSize: 10
     },
     messageImage: {
         width: 240,

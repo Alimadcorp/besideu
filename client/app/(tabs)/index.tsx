@@ -67,8 +67,22 @@ export default function ChatsScreen() {
       return;
     }
     try {
-      const data = await apiRequest('/v1/messages/list');
-      setDms(data.dms || []);
+      //const data = await apiRequest('/v1/messages/list');
+      //setDms(data.dms || []);
+      setDms([{
+        id: "www",
+        type: 'dm',
+        user_id: "wwww",
+        username: "kela",
+        real_name: "kola",
+        avatar_url: "https://www.otherUser.avatar_url",
+        last_message: {
+          text: '',
+          timestamp: 0,
+        },
+        unread_count: 0,
+        updated_at: 0
+      }] as any);
     } catch (error) {
       console.error('Failed to fetch chats:', error);
     } finally {

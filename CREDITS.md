@@ -26,6 +26,9 @@ Started the actual development.
 ### Expected Beta: 1/1/2026
 InshaAllah
 
+### Expected Initial Release: 4/2/2026
+:P
+
 ### Expected Release: 3/1/2026
 Yeah
 

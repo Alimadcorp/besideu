@@ -53,7 +53,7 @@ export async function GET(req) {
         .from('friends')
         .select('user_id_1, user_id_2')
         .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`),
-      
+
       // 2. Fetch users with 3km location hash match (business users first, we'll add friends)
       supabaseAdmin
         .from('user_locations')
@@ -98,10 +98,10 @@ export async function GET(req) {
       }
     }
 
-    if (candidatesErr) {
-      console.error('[location/find] Error fetching nearby users', candidatesErr);
+    if (businessErr) {
+      console.error('[location/find] Error fetching business users', businessErr);
       return NextResponse.json(
-        { error: 'Failed to fetch nearby users', code: 'supabase_error' },
+        { error: 'Failed to fetch business users', code: 'supabase_error' },
         { status: 500 },
       );
     }
@@ -115,7 +115,7 @@ export async function GET(req) {
       // All users in this list are within 3km (since we filtered by hash match)
       const isFriend = friendIds.includes(row.user_id);
       const isBusiness = row.users?.is_business === true;
-      
+
       users.push({
         id: row.user_id,
         username: row.users?.username || null,
