@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../lib/supabaseClient';
-import { getCurrentUserFromRequest } from '../../../../lib/authUser';
+import { supabaseAdmin } from '@/lib/supabaseClient';
+import { getCurrentUserFromRequest } from '@/lib/authUser';
 
 export async function POST(req, { params }) {
     const { id: statusId } = await params;
