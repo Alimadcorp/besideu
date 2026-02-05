@@ -127,7 +127,6 @@ export default function ProfileScreen() {
         setSaving(true);
         try {
             const formData = new FormData();
-            // Handle different names/types if needed, but for RN this is the standard pattern
             formData.append('image', {
                 uri: uri,
                 type: 'image/jpeg',
@@ -315,7 +314,6 @@ export default function ProfileScreen() {
                             </ThemedText>
                         </View>
                     )}
-                    {saving && <ThemedText style={{ fontSize: 12, color: theme.tint, marginTop: 5 }}>Saving...</ThemedText>}
                 </View>
 
                 {/* Account Section */}
@@ -591,14 +589,19 @@ export default function ProfileScreen() {
 
                     <View style={[styles.row, { borderBottomColor: theme.icon }]}>
                         <ThemedText style={styles.rowLabel}>Version</ThemedText>
-                        <ThemedText style={styles.rowValue}>1.0.0 (Beta)</ThemedText>
+                        <ThemedText style={styles.rowValue}>1.0 (22)</ThemedText>
                     </View>
 
                     <View style={[styles.row, { borderBottomColor: theme.icon }]}>
                         <ThemedText style={styles.rowLabel}>Built by Ravians</ThemedText>
                         <ThemedText style={[styles.rowValue, { fontSize: 12, textAlign: 'right', flex: 1 }]}>
-                            Students of GCU Lahore{'\n'}for Ravians with love
+                            for Ravians
                         </ThemedText>
+                    </View>
+
+                    <View style={[styles.row, { borderBottomColor: theme.icon }]}>
+                        <ThemedText style={styles.rowLabel}>Founder</ThemedText>
+                        <ThemedText style={styles.rowValue}>Habeebullah Arif</ThemedText>
                     </View>
 
                     <View style={[styles.row, { borderBottomColor: theme.icon }]}>

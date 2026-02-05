@@ -113,18 +113,7 @@ export default function ChatScreen() {
 
             const queryString = params.toString();
             if (queryString) url += `?${queryString}`;
-            //const data: ChatData = await apiRequest(url);
-            const data: ChatData = {
-                dm_id: "chatId",
-                user: { id: "chatInfo", username: "a" },
-                messages: [{
-                    id: "www",
-                    text: "aidwhoiahdt holy hap\nnew line content\t\r\nhwuauwhauh",
-                    sender_id: "wwww",
-                    timestamp: "2025-01-01T12:12:12.000Z",
-                }],
-                reactions: [],
-            }
+            const data: ChatData = await apiRequest(url);
 
             if (!after) {
                 // Initial load
@@ -685,7 +674,7 @@ export default function ChatScreen() {
                     }}
                     keyExtractor={(item, index) => item.type === 'date' ? `date-${item.date}` : item.message?.id || `msg-${index}`}
                     inverted
-                    contentContainerStyle={[styles.listContent, { paddingTop: 70 + keyboardPadding }]}
+                    contentContainerStyle={[styles.listContent, { paddingTop: 100 + keyboardPadding }]}
                     showsVerticalScrollIndicator={false}
                 />
 
