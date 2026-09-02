@@ -1,14 +1,8 @@
 # BesideU
 
-**App name**: BesideU
+## An app by Muhammad Ali and Habeebullah Arif Wattoo
 
-**Logo**: **BU**
-
-**App tagline**: _Wo line maarne waale uncle zara bahir gaye hain_
-
-**Creator**: Habeebullah Arif Wattoo
-
-The main purpose of this app is to connect users physically. They must be location aware of each other. App works similar to Facebook where you can add friends based on contacts. You can see which one of those friends are nearby (in an X kilometer radius, varying on their and other's preferences), you can chat with those friends. You can send meetup requests to those friends to make them send their exact location. Business accounts can create meetings with real-time attendance tracking.
+This is a location aware social app. An app that tells you when a friend is nearby, and with end-to-end-encrytion, the locations of users are safe, and calculations are performed on regional hashes instead of exact cooridinates.
 
 ---
 
@@ -16,64 +10,41 @@ The main purpose of this app is to connect users physically. They must be locati
 
 - [Structure](#structure)
 - [Frontend](#frontend)
-  - [Technologies](#technologies)
-  - [Deployment](#deployment)
-  - [Layout](#layout)
-  - [Features](#features)
 - [Backend](#backend)
-  - [Technologies](#technologies-1)
-  - [Deployment](#deployment-1)
-  - [NextJS App API](#nextjs-app-api)
-  - [Express WebSocket App](#express-websocket-app)
-- [Database Schema](#database-schema)
-- [Environment Variables](#environment-variables)
-- [Authentication Flow](#authentication-flow)
 
 ---
 
 ## Structure
 
-`client`: Contains the Frontend Expo.dev client code (co.alimad.besideu)
+`.`: Contains the main Flutter app (co.alimad.besideu)
 
-`web`: Do not touch, contains a NextJS app for advertisement (https://besideu.alimad.co)
+`server`: Contains the server code
 
-`api`: Contains NextJS backend (https://api.besideu.alimad.co)
+---
 
-`socket`: Contains Express backend (https://ws.besideu.alimad.co)
-
-`database`: Contains SQL migration files for Supabase
+The rest of this readme is written by AI, it will be replaced soon...
 
 ---
 
 ## Frontend
 
-### Technologies:
-  - Expo.dev (React Native)
-  - React Native Maps (for meeting location tracking)
-  - Expo Location (for geolocation)
-  - Firebase (for phone authentication)
-
-### Deployment:
-  - Will be released as Android-only app on Google Play Store
-
-### Layout:
-
-The app has a tab-based navigation with the following main screens:
+### Technology:
+  - Flutter
 
 #### Main Tabs:
-1. **Chats** (`(tabs)/index.tsx`) - List of all DM conversations
-2. **Map** (`(tabs)/maps.tsx`) - Shows nearby friends based on location
-3. **Status** (`(tabs)/status.tsx`) - View and post Instagram-style stories
-4. **Profile** (`(tabs)/profile.tsx`) - User profile and settings
+1. **Chats** (`(tabs)/index`) - List of all DM conversations
+2. **Map** (`(tabs)/maps`) - Shows nearby friends based on location
+3. **Status** (`(tabs)/status`) - View and post Instagram-style stories
+4. **Profile** (`(tabs)/profile`) - User profile and settings
 
 #### Additional Screens:
-- **Intro** (`intro.tsx`) - First-time user onboarding (shown once)
+- **Intro** (`intro`) - First-time user onboarding (shown once)
 - **Auth** (`auth/`) - Login and signup flows
-- **Chats** (`chats/[id].tsx`) - Individual chat conversation
+- **Chats** (`chats/[id]`) - Individual chat conversation
 - **Meetings** (`meetings/`) - Create and view meetings (business accounts)
 - **Friends** (`friends/`) - Manage friends and friend requests
 - **Contacts** (`contacts/`) - Sync and invite from phone contacts
-- **User Profile** (`user/[id].tsx`) - View other users' profiles
+- **User Profile** (`user/[id]`) - View other users' profiles
 - **Status** (`status/`) - Create and view user statuses
 
 ### Features:
@@ -135,21 +106,7 @@ The app has a tab-based navigation with the following main screens:
 ## Backend
 
 ### Technologies:
-  - NextJS as backend API
-  - Supabase as storage and operations
-  - One separate Express app for WebSocket
-  - Firebase Admin SDK for authentication
-  - ImgBB for image hosting
-
-### Deployment:
-  - NextJS app must be deployable on Vercel (Operations must be optimized to run within at most 5 seconds)
-  - Express app will temporarily deploy on Railway.app
-
-### NextJS App API
-
-This app works on the app router, and exposes many API methods to allow users to perform operations. We store only a custom privacy-preserving hash of the location of all the users in the server, and use that to find neighboring users. We can use the exact location only when a `meetup` is requested.
-
-**Base URL**: `https://api.besideu.alimad.co`
+  - Idk maybe SpacetimeDB using Rust
 
 #### Authentication Endpoints (`/auth`)
 

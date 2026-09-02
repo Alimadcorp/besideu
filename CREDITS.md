@@ -5,7 +5,6 @@
 ### Director: Habeebullah Arif
 ### Co-Director: Aneeq
 ### Cooridinator: Hadi Bhai
-### Contributors: [null]
 
 ---
 
@@ -26,12 +25,20 @@ Started the actual development.
 ### Expected Beta: 1/1/2026
 InshaAllah
 
-### Expected Initial Release: 4/2/2026
+### Expected Initial Release: 2/4/2026
 :P
 
 ### Expected Release: 3/1/2026
 Yeah
 
+### Initial Release Failure
+Sadly we failed to release the app on the planned date due to Play Store rejecting our app. I planned to make a remake soon in the future.
+
+### Remake in Flutter 9/2/2026
+I am now gonna try to remake the whole app using Flutter, and Spacetime or smth entirely WS based for backend.
+
 ---
 
 Made with love by students of the GCU Lahore, code held together with duct tape, glue, and a hope. A hope of being able to help people of the society, to solve, at any rate, their problems.
+
+:P
